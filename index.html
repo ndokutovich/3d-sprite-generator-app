@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model to 8-Directional Sprite Generator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 3D Model to Sprite Generator</h1>
+            <p>Load 3D models and create 8-directional sprites</p>
+        </div>
+
+        <div class="main-content">
+            <div class="controls">
+                <div class="control-group">
+                    <h3>📁 Load 3D Model</h3>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="modelFile" accept=".glb,.gltf,.fbx,.stl,.obj">
+                        <label for="modelFile" class="file-input-label">Choose Model File</label>
+                    </div>
+                    <div class="file-name" id="fileName">No file selected</div>
+                    <div class="info-box">
+                        Supports: GLB, GLTF, FBX, STL, OBJ
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>🎬 Animation</h3>
+                    <label for="animationSelect">Select Animation:</label>
+                    <select id="animationSelect" disabled>
+                        <option value="-1">No Animation</option>
+                    </select>
+                    
+                    <label for="animationTime" style="margin-top: 15px;">
+                        Animation Time: <span class="range-value" id="timeValue">0.0s</span>
+                    </label>
+                    <input type="range" id="animationTime" min="0" max="1" step="0.01" value="0" disabled>
+                </div>
+
+                <div class="control-group">
+                    <h3>🎨 Render Settings</h3>
+                    <label for="spriteSize">Sprite Size (px):</label>
+                    <input type="number" id="spriteSize" value="256" min="64" max="2048" step="64">
+
+                    <label for="cameraDistance" style="margin-top: 15px;">
+                        Camera Distance: <span class="range-value" id="distanceValue">5.0</span>
+                    </label>
+                    <input type="range" id="cameraDistance" min="1" max="20" step="0.5" value="5">
+
+                    <label for="cameraHeight" style="margin-top: 15px;">
+                        Camera Height: <span class="range-value" id="heightValue">1.5</span>
+                    </label>
+                    <input type="range" id="cameraHeight" min="0" max="5" step="0.1" value="1.5">
+                </div>
+
+                <div class="control-group">
+                    <h3>📸 Generate Sprites</h3>
+                    <button id="generateBtn" disabled>Generate 8-Direction Sprites</button>
+                    <button id="downloadBtn" disabled>Download ZIP Archive</button>
+                    <div class="success-message" id="successMessage">
+                        ✓ Sprites generated successfully!
+                    </div>
+                </div>
+            </div>
+
+            <div class="viewport">
+                <canvas id="canvas3d"></canvas>
+                <div class="loading" id="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <div class="loading-status" id="loadingStatus">Loading model...</div>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progressBar"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">0%</div>
+                </div>
+                <div class="error-message" id="errorMessage">
+                    <h3>⚠️ Error Loading Model</h3>
+                    <p id="errorText"></p>
+                    <button onclick="document.getElementById('errorMessage').style.display='none'">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="sprite-preview" id="spritePreview" style="display: none;">
+            <!-- Sprites will be inserted here -->
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
