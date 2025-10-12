@@ -56,18 +56,16 @@ class FileHandler {
             sprites.forEach((sprite, index) => {
                 const base64Data = sprite.data.split(',')[1];
 
-                // Use structured naming: directionIndex_frameIndex_directionName.png
-                const dirName = sprite.directionName.toLowerCase().replace(/\s+/g, '_');
-                const fileName = sprite.frameIndex !== undefined
-                    ? `${sprite.directionIndex}_${sprite.frameIndex}_${dirName}.png`
-                    : `${index}_${sprite.name.toLowerCase().replace(/\s+/g, '_')}.png`;
+                // Use Sprite class fileName method for consistent naming
+                const fileName = sprite.fileName || `${index}_fallback.png`;
 
                 folder.file(fileName, base64Data, { base64: true });
 
                 const progress = 20 + ((index + 1) / sprites.length) * 40;
+                const displayName = sprite.displayName || sprite.name || 'sprite';
                 this.uiController.updateProgress(
                     progress,
-                    `Adding ${sprite.name}... (${index + 1}/${sprites.length})`
+                    `Adding ${displayName}... (${index + 1}/${sprites.length})`
                 );
             });
 

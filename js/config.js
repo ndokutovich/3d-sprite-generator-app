@@ -124,7 +124,12 @@ const CONFIG = {
             duration: 3.0,
             amplitude: 0.3
         }
-    ]
+    ],
+
+    ANIMATION: {
+        PROCEDURAL_INDEX_OFFSET: 1000, // Offset to distinguish procedural from embedded animations
+        NO_ANIMATION: -1
+    }
 };
 
 // Export for use in other modules

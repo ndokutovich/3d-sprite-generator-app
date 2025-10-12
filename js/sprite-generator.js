@@ -5,6 +5,7 @@ class SpriteGenerator {
         this.uiController = uiController;
         this.animationController = animationController;
         this.generatedSprites = [];
+        this.frameCalculator = new AnimationFrameCalculator();
     }
 
     async generateSprites() {
@@ -12,57 +13,165 @@ class SpriteGenerator {
             return Promise.reject(new Error('No model loaded'));
         }
 
-        this.uiController.showLoading('Generating sprites...', 0);
-        this.generatedSprites = [];
+        try {
+            this.uiController.showLoading('Generating sprites...', 0);
+            this.generatedSprites = [];
 
+            const context = this.prepareGenerationContext();
+
+            await this.generateAllDirectionalSprites(context);
+
+            this.restoreRenderingState(context);
+
+            this.displayResults();
+
+            return this.generatedSprites;
+        } catch (error) {
+            // Cleanup on error
+            this.cleanup();
+            throw error;
+        }
+    }
+
+    prepareGenerationContext() {
         const spriteSize = this.uiController.getSpriteSize();
         const selectedAnimation = this.uiController.getSelectedAnimation();
 
         // Only use multiple frames if animation is selected
-        const animationFrames = selectedAnimation >= 0
+        const animationFrames = this.animationController.isAnimationSelected(selectedAnimation)
             ? this.uiController.getAnimationFrames()
             : 1;
+
+        const animationDuration = this.animationController.getAnimationDuration(selectedAnimation);
 
         // Use distance from slider but angle from current camera view
         const distance = this.uiController.getCameraDistance();
         const pitch = this.threeSetup.getCurrentCameraPitch();
 
-        // Save original camera position
+        // Calculate height and horizontal distance from pitch angle
+        const height = distance * Math.sin(pitch);
+        const horizontalDistance = distance * Math.cos(pitch);
+
+        // Get directions
+        const directionCount = this.uiController.getDirectionCount();
+        const directions = directionCount === 16 ? CONFIG.DIRECTIONS_16 : CONFIG.DIRECTIONS_8;
+
+        // Save state for restoration
         const originalCameraPosition = this.threeSetup.camera.position.clone();
-
-        // Save original renderer size
         const originalSize = this.threeSetup.getRendererSize();
+        const originalAspect = this.threeSetup.camera.aspect;
 
-        // Hide grid and set transparent background for sprite rendering
+        // Setup for sprite rendering
         this.threeSetup.hideGrid();
         this.threeSetup.setTransparentBackground();
-
-        // Set sprite size
         this.uiController.updateProgress(10, 'Preparing renderer...');
         this.threeSetup.setRendererSize(spriteSize, spriteSize);
 
-        // Generate sprites
-        await this.generateDirectionalSprites(distance, pitch, animationFrames);
+        // Set camera aspect to 1:1 for square sprites
+        this.threeSetup.camera.aspect = 1.0;
+        this.threeSetup.camera.updateProjectionMatrix();
 
-        // Restore original size and settings
-        this.uiController.updateProgress(95, 'Restoring view...');
-        this.threeSetup.setRendererSize(originalSize.width, originalSize.height);
-        this.threeSetup.onWindowResize();
+        return {
+            spriteSize,
+            selectedAnimation,
+            animationFrames,
+            animationDuration,
+            height,
+            horizontalDistance,
+            directions,
+            originalCameraPosition,
+            originalSize,
+            originalAspect
+        };
+    }
 
-        // Restore camera position
-        this.threeSetup.setCameraPosition(
-            originalCameraPosition.x,
-            originalCameraPosition.y,
-            originalCameraPosition.z
+    async generateAllDirectionalSprites(context) {
+        const totalSprites = this.frameCalculator.calculateTotalSprites(
+            context.directions.length,
+            context.animationFrames
         );
 
-        // Restore grid and opaque background
+        let completedSprites = 0;
+
+        for (let directionIndex = 0; directionIndex < context.directions.length; directionIndex++) {
+            const direction = context.directions[directionIndex];
+
+            for (let frameIndex = 0; frameIndex < context.animationFrames; frameIndex++) {
+                await this.generateSingleSprite(
+                    direction,
+                    directionIndex,
+                    frameIndex,
+                    context,
+                    completedSprites,
+                    totalSprites
+                );
+
+                completedSprites++;
+
+                // Small delay for UI updates
+                await this.delay(50);
+            }
+        }
+    }
+
+    async generateSingleSprite(direction, directionIndex, frameIndex, context, completedSprites, totalSprites) {
+        // Update progress
+        const progress = this.frameCalculator.calculateProgress(completedSprites, totalSprites);
+        const statusText = context.animationFrames > 1
+            ? `Rendering ${direction.name} frame ${frameIndex + 1}/${context.animationFrames}... (${completedSprites + 1}/${totalSprites})`
+            : `Rendering ${direction.name}... (${completedSprites + 1}/${totalSprites})`;
+
+        this.uiController.updateProgress(progress, statusText);
+
+        // Set animation time if animation is selected
+        if (this.animationController.isAnimationSelected(context.selectedAnimation)) {
+            const animTime = this.frameCalculator.calculateFrameTime(
+                frameIndex,
+                context.animationFrames,
+                context.animationDuration
+            );
+            this.animationController.setAnimationTime(animTime);
+        }
+
+        // Position camera
+        const x = Math.sin(direction.angle) * context.horizontalDistance;
+        const z = Math.cos(direction.angle) * context.horizontalDistance;
+        this.threeSetup.setCameraPosition(x, context.height, z);
+        this.threeSetup.setCameraLookAt(0, 0, 0);
+
+        // Render and capture
+        this.threeSetup.render();
+        const dataURL = this.threeSetup.captureFrame();
+
+        // Create sprite object
+        const sprite = new Sprite(directionIndex, frameIndex, direction.name, dataURL);
+        this.generatedSprites.push(sprite);
+    }
+
+    restoreRenderingState(context) {
+        this.uiController.updateProgress(95, 'Restoring view...');
+
+        // Restore renderer size
+        this.threeSetup.setRendererSize(context.originalSize.width, context.originalSize.height);
+        this.threeSetup.onWindowResize();
+
+        // Restore camera
+        this.threeSetup.setCameraPosition(
+            context.originalCameraPosition.x,
+            context.originalCameraPosition.y,
+            context.originalCameraPosition.z
+        );
+        this.threeSetup.camera.aspect = context.originalAspect;
+        this.threeSetup.camera.updateProjectionMatrix();
+
+        // Restore grid and background
         this.threeSetup.showGrid();
         this.threeSetup.setOpaqueBackground();
 
         this.uiController.updateProgress(100, 'Complete!');
+    }
 
-        // Display results
+    displayResults() {
         this.uiController.displaySprites(this.generatedSprites);
         this.uiController.enableDownloadButton();
         this.uiController.showSuccessMessage();
@@ -71,120 +180,21 @@ class SpriteGenerator {
             this.uiController.hideSuccessMessage();
             this.uiController.hideLoading();
         }, 2000);
-
-        return this.generatedSprites;
     }
 
-    async generateDirectionalSprites(distance, pitch, animationFrames) {
-        const directionCount = this.uiController.getDirectionCount();
-        const directions = directionCount === 16 ? CONFIG.DIRECTIONS_16 : CONFIG.DIRECTIONS_8;
-        const spriteSize = this.uiController.getSpriteSize();
-
-        // Get animation info
-        const selectedAnimation = this.uiController.getSelectedAnimation();
-        const animationDuration = this.getAnimationDuration(selectedAnimation);
-
-        // Calculate height and horizontal distance from pitch angle and distance
-        const height = distance * Math.sin(pitch);
-        const horizontalDistance = distance * Math.cos(pitch);
-
-        // Save original camera aspect ratio
-        const originalAspect = this.threeSetup.camera.aspect;
-
-        // Set camera aspect to 1:1 for square sprites
-        this.threeSetup.camera.aspect = 1.0;
-        this.threeSetup.camera.updateProjectionMatrix();
-
-        let directionIndex = 0;
-        let frameIndex = 0;
-        const totalSprites = directions.length * animationFrames;
-        let completedSprites = 0;
-
-        return new Promise((resolve) => {
-            const generateNextSprite = () => {
-                if (directionIndex >= directions.length) {
-                    // Restore original aspect ratio
-                    this.threeSetup.camera.aspect = originalAspect;
-                    this.threeSetup.camera.updateProjectionMatrix();
-                    resolve();
-                    return;
-                }
-
-                const dir = directions[directionIndex];
-                const progress = 10 + (completedSprites / totalSprites) * 80;
-
-                // Calculate animation time for this frame
-                const animTime = animationFrames > 1
-                    ? (frameIndex / (animationFrames - 1)) * animationDuration
-                    : 0;
-
-                this.uiController.updateProgress(
-                    progress,
-                    `Rendering ${dir.name} frame ${frameIndex + 1}/${animationFrames}... (${completedSprites + 1}/${totalSprites})`
-                );
-
-                // Set animation time if animation is selected
-                if (selectedAnimation >= 0) {
-                    this.animationController.setAnimationTime(animTime);
-                }
-
-                // Position camera using pitch angle
-                const x = Math.sin(dir.angle) * horizontalDistance;
-                const z = Math.cos(dir.angle) * horizontalDistance;
-                this.threeSetup.setCameraPosition(x, height, z);
-                this.threeSetup.setCameraLookAt(0, 0, 0);
-
-                // Render
-                this.threeSetup.render();
-
-                // Capture sprite
-                const dataURL = this.threeSetup.captureFrame();
-                this.generatedSprites.push({
-                    name: animationFrames > 1
-                        ? `${dir.name}_frame${frameIndex}`
-                        : dir.name,
-                    directionIndex: directionIndex,
-                    frameIndex: frameIndex,
-                    directionName: dir.name,
-                    data: dataURL
-                });
-
-                completedSprites++;
-                frameIndex++;
-
-                // Move to next direction if all frames are done
-                if (frameIndex >= animationFrames) {
-                    frameIndex = 0;
-                    directionIndex++;
-                }
-
-                // Small delay to allow UI to update
-                setTimeout(generateNextSprite, 50);
-            };
-
-            // Start generation
-            setTimeout(generateNextSprite, 100);
-        });
-    }
-
-    getAnimationDuration(selectedAnimation) {
-        if (selectedAnimation < 0) return 1.0; // No animation
-
-        // Check if it's procedural (index >= 1000)
-        if (selectedAnimation >= 1000) {
-            const proceduralIndex = selectedAnimation - 1000;
-            if (proceduralIndex < CONFIG.PROCEDURAL_ANIMATIONS.length) {
-                return CONFIG.PROCEDURAL_ANIMATIONS[proceduralIndex].duration;
-            }
-        } else {
-            // Embedded animation
-            const animations = this.animationController.getAnimations();
-            if (selectedAnimation < animations.length) {
-                return animations[selectedAnimation].duration;
-            }
+    cleanup() {
+        // Restore rendering state if possible
+        try {
+            this.threeSetup.showGrid();
+            this.threeSetup.setOpaqueBackground();
+            this.uiController.hideLoading();
+        } catch (e) {
+            console.error('Error during cleanup:', e);
         }
+    }
 
-        return 1.0; // Fallback
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     getGeneratedSprites() {

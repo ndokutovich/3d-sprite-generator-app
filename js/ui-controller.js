@@ -147,7 +147,7 @@ class UIController {
             proceduralGroup.label = 'Standard Animations';
             proceduralAnimations.forEach((anim, index) => {
                 const option = document.createElement('option');
-                option.value = 1000 + index; // Offset to distinguish from embedded
+                option.value = CONFIG.ANIMATION.PROCEDURAL_INDEX_OFFSET + index;
                 option.textContent = anim.name;
                 proceduralGroup.appendChild(option);
             });
@@ -189,37 +189,63 @@ class UIController {
         this.elements.lightValue.textContent = intensity.toFixed(1);
     }
 
-    // Get input values
+    // Get input values with validation
     getSpriteSize() {
-        return parseInt(this.elements.spriteSize.value);
+        const value = parseInt(this.elements.spriteSize.value);
+        if (isNaN(value) || value < CONFIG.SPRITE.MIN_SIZE || value > CONFIG.SPRITE.MAX_SIZE) {
+            return CONFIG.SPRITE.DEFAULT_SIZE;
+        }
+        return value;
     }
 
     getCameraDistance() {
-        return parseFloat(this.elements.cameraDistance.value);
+        const value = parseFloat(this.elements.cameraDistance.value);
+        if (isNaN(value) || value < CONFIG.CAMERA.MIN_DISTANCE || value > CONFIG.CAMERA.MAX_DISTANCE) {
+            return CONFIG.CAMERA.DEFAULT_DISTANCE;
+        }
+        return value;
     }
 
     getCameraHeight() {
-        return parseFloat(this.elements.cameraHeight.value);
+        const value = parseFloat(this.elements.cameraHeight.value);
+        if (isNaN(value) || value < CONFIG.CAMERA.MIN_HEIGHT || value > CONFIG.CAMERA.MAX_HEIGHT) {
+            return CONFIG.CAMERA.DEFAULT_HEIGHT;
+        }
+        return value;
     }
 
     getLightIntensity() {
-        return parseFloat(this.elements.lightIntensity.value);
+        const value = parseFloat(this.elements.lightIntensity.value);
+        if (isNaN(value) || value < 0) {
+            return 3.0; // Default light intensity
+        }
+        return value;
     }
 
     getDirectionCount() {
-        return parseInt(this.elements.directionCount.value);
+        const value = parseInt(this.elements.directionCount.value);
+        return (value === 16) ? 16 : 8; // Only allow 8 or 16
     }
 
     getAnimationFrames() {
-        return parseInt(this.elements.animationFrames.value);
+        const value = parseInt(this.elements.animationFrames.value);
+        if (isNaN(value) || value < 1) {
+            return 1;
+        }
+        if (value > 32) {
+            return 32;
+        }
+        return value;
     }
 
     getSelectedAnimation() {
-        return parseInt(this.elements.animationSelect.value);
+        const value = parseInt(this.elements.animationSelect.value);
+        return isNaN(value) ? CONFIG.ANIMATION.NO_ANIMATION : value;
     }
 
     getAnimationTime() {
-        return parseFloat(this.elements.animationTime.value);
+        const value = parseFloat(this.elements.animationTime.value);
+        return isNaN(value) ? 0 : Math.max(0, value);
     }
 
     // Sprite preview
@@ -233,13 +259,17 @@ class UIController {
 
             const img = document.createElement('img');
             img.src = sprite.data;
-            img.alt = sprite.name;
+
+            // Use Sprite class methods for consistent naming
+            const displayName = sprite.displayName || sprite.name || 'sprite';
+            img.alt = displayName;
+
             img.addEventListener('click', () => {
-                this.showSpriteModal(sprite.data, sprite.name);
+                this.showSpriteModal(sprite.data, displayName);
             });
 
             const caption = document.createElement('p');
-            caption.textContent = sprite.name;
+            caption.textContent = displayName;
 
             item.appendChild(img);
             item.appendChild(caption);

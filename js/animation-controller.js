@@ -68,9 +68,9 @@ class AnimationController {
         // Restore original transform
         this.restoreOriginalTransform();
 
-        // Check if it's a procedural animation (index >= 1000)
-        if (index >= 1000) {
-            const proceduralIndex = index - 1000;
+        // Check if it's a procedural animation (using offset constant)
+        if (index >= CONFIG.ANIMATION.PROCEDURAL_INDEX_OFFSET) {
+            const proceduralIndex = index - CONFIG.ANIMATION.PROCEDURAL_INDEX_OFFSET;
             if (proceduralIndex >= 0 && proceduralIndex < this.proceduralAnimations.length) {
                 this.currentProceduralAnimation = this.proceduralAnimations[proceduralIndex];
                 const duration = this.currentProceduralAnimation.duration;
@@ -183,4 +183,40 @@ class AnimationController {
     hasActiveAnimation() {
         return this.mixer !== null || this.currentProceduralAnimation !== null;
     }
+
+    /**
+     * Get duration of currently selected animation
+     * @param {number} selectedAnimationIndex - Animation index from UI
+     * @returns {number} Duration in seconds
+     */
+    getAnimationDuration(selectedAnimationIndex) {
+        if (selectedAnimationIndex < 0) {
+            return 1.0; // No animation
+        }
+
+        // Check if it's procedural
+        if (selectedAnimationIndex >= CONFIG.ANIMATION.PROCEDURAL_INDEX_OFFSET) {
+            const proceduralIndex = selectedAnimationIndex - CONFIG.ANIMATION.PROCEDURAL_INDEX_OFFSET;
+            if (proceduralIndex >= 0 && proceduralIndex < this.proceduralAnimations.length) {
+                return this.proceduralAnimations[proceduralIndex].duration;
+            }
+        } else {
+            // Embedded animation
+            if (selectedAnimationIndex >= 0 && selectedAnimationIndex < this.animations.length) {
+                return this.animations[selectedAnimationIndex].duration;
+            }
+        }
+
+        return 1.0; // Fallback
+    }
+
+    /**
+     * Check if animation is selected (not "No Animation")
+     * @param {number} selectedAnimationIndex - Animation index from UI
+     * @returns {boolean}
+     */
+    isAnimationSelected(selectedAnimationIndex) {
+        return selectedAnimationIndex >= 0;
+    }
 }
+
