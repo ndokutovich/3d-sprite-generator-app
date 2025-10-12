@@ -6,7 +6,7 @@ class App {
         this.threeSetup = new ThreeSetup();
         this.modelLoader = new ModelLoader(this.threeSetup, this.uiController);
         this.animationController = new AnimationController(this.threeSetup, this.uiController);
-        this.spriteGenerator = new SpriteGenerator(this.threeSetup, this.uiController);
+        this.spriteGenerator = new SpriteGenerator(this.threeSetup, this.uiController, this.animationController);
         this.fileHandler = new FileHandler(this.uiController);
 
         // Initialize the application
@@ -165,9 +165,9 @@ class App {
     animate() {
         requestAnimationFrame(() => this.animate());
 
-        // Update animations
+        // Update animations (both embedded and procedural)
         const delta = this.threeSetup.getDelta();
-        if (this.animationController.hasMixer()) {
+        if (this.animationController.hasActiveAnimation()) {
             this.animationController.update(delta);
         }
 

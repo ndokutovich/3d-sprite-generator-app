@@ -4,7 +4,7 @@ const CONFIG = {
         FOV: 45,
         NEAR: 0.1,
         FAR: 1000,
-        DEFAULT_DISTANCE: 5,
+        DEFAULT_DISTANCE: 3,
         DEFAULT_HEIGHT: 1.5,
         MIN_DISTANCE: 1,
         MAX_DISTANCE: 20,
@@ -13,7 +13,7 @@ const CONFIG = {
     },
 
     SPRITE: {
-        DEFAULT_SIZE: 256,
+        DEFAULT_SIZE: 512,
         MIN_SIZE: 64,
         MAX_SIZE: 2048,
         STEP_SIZE: 64
@@ -39,6 +39,37 @@ const CONFIG = {
         SUPPORTED_FORMATS: ['glb', 'gltf', 'fbx', 'stl', 'obj']
     },
 
+    DIRECTIONS_8: [
+        { name: 'South', angle: 0 },
+        { name: 'South-East', angle: Math.PI / 4 },
+        { name: 'East', angle: Math.PI / 2 },
+        { name: 'North-East', angle: 3 * Math.PI / 4 },
+        { name: 'North', angle: Math.PI },
+        { name: 'North-West', angle: 5 * Math.PI / 4 },
+        { name: 'West', angle: 3 * Math.PI / 2 },
+        { name: 'South-West', angle: 7 * Math.PI / 4 }
+    ],
+
+    DIRECTIONS_16: [
+        { name: 'S', angle: 0 },
+        { name: 'SSE', angle: Math.PI / 8 },
+        { name: 'SE', angle: Math.PI / 4 },
+        { name: 'ESE', angle: 3 * Math.PI / 8 },
+        { name: 'E', angle: Math.PI / 2 },
+        { name: 'ENE', angle: 5 * Math.PI / 8 },
+        { name: 'NE', angle: 3 * Math.PI / 4 },
+        { name: 'NNE', angle: 7 * Math.PI / 8 },
+        { name: 'N', angle: Math.PI },
+        { name: 'NNW', angle: 9 * Math.PI / 8 },
+        { name: 'NW', angle: 5 * Math.PI / 4 },
+        { name: 'WNW', angle: 11 * Math.PI / 8 },
+        { name: 'W', angle: 3 * Math.PI / 2 },
+        { name: 'WSW', angle: 13 * Math.PI / 8 },
+        { name: 'SW', angle: 7 * Math.PI / 4 },
+        { name: 'SSW', angle: 15 * Math.PI / 8 }
+    ],
+
+    // Keep DIRECTIONS for backwards compatibility (defaults to 8)
     DIRECTIONS: [
         { name: 'South', angle: 0 },
         { name: 'South-East', angle: Math.PI / 4 },
@@ -66,7 +97,34 @@ const CONFIG = {
         FILE_NAME: 'sprites_8_directional.zip',
         COMPRESSION_LEVEL: 6,
         FOLDER_NAME: 'sprites'
-    }
+    },
+
+    PROCEDURAL_ANIMATIONS: [
+        {
+            name: 'Idle (Bounce)',
+            type: 'bounce',
+            duration: 2.0,
+            amplitude: 0.15
+        },
+        {
+            name: 'Rotation',
+            type: 'rotate',
+            duration: 4.0,
+            speed: Math.PI / 2  // 90 degrees per second
+        },
+        {
+            name: 'Scale Pulse',
+            type: 'pulse',
+            duration: 2.0,
+            amplitude: 0.1
+        },
+        {
+            name: 'Bob Up/Down',
+            type: 'bob',
+            duration: 3.0,
+            amplitude: 0.3
+        }
+    ]
 };
 
 // Export for use in other modules

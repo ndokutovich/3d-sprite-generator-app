@@ -87,7 +87,7 @@ class ThreeSetup {
         this.camera.lookAt(0, 0, 0);
 
         // Add camera light that follows the camera viewpoint
-        this.cameraLight = new THREE.PointLight(0xffffff, 1.0, 100);
+        this.cameraLight = new THREE.PointLight(0xffffff, 3.0, 100);
         this.cameraLight.position.set(0, 0, 0); // Positioned at camera origin
         this.camera.add(this.cameraLight);
         this.scene.add(this.camera); // Add camera to scene so the light gets added too
@@ -270,6 +270,20 @@ class ThreeSetup {
 
     getCurrentCameraHeight() {
         return this.camera.position.y;
+    }
+
+    // Get camera pitch angle (vertical angle from horizontal plane)
+    getCurrentCameraPitch() {
+        const target = this.controls ? this.controls.target : new THREE.Vector3(0, 0, 0);
+        const dx = this.camera.position.x - target.x;
+        const dy = this.camera.position.y - target.y;
+        const dz = this.camera.position.z - target.z;
+
+        // Calculate horizontal distance
+        const horizontalDistance = Math.sqrt(dx * dx + dz * dz);
+
+        // Calculate pitch angle (angle from horizontal plane)
+        return Math.atan2(dy, horizontalDistance);
     }
 
     captureFrame() {

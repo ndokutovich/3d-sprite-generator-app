@@ -22,8 +22,38 @@ class UIController {
             heightValue: document.getElementById('heightValue'),
             lightIntensity: document.getElementById('lightIntensity'),
             lightValue: document.getElementById('lightValue'),
-            spriteSize: document.getElementById('spriteSize')
+            spriteSize: document.getElementById('spriteSize'),
+            spriteModal: document.getElementById('spriteModal'),
+            modalImage: document.getElementById('modalImage'),
+            modalCaption: document.getElementById('modalCaption'),
+            modalClose: document.getElementById('modalClose'),
+            directionCount: document.getElementById('directionCount'),
+            animationFrames: document.getElementById('animationFrames')
         };
+
+        // Setup modal close handlers
+        this.setupModalHandlers();
+    }
+
+    setupModalHandlers() {
+        // Close on X button click
+        this.elements.modalClose.addEventListener('click', () => {
+            this.closeSpriteModal();
+        });
+
+        // Close on background click
+        this.elements.spriteModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.spriteModal) {
+                this.closeSpriteModal();
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.elements.spriteModal.style.display === 'block') {
+                this.closeSpriteModal();
+            }
+        });
     }
 
     // Loading state management
@@ -95,15 +125,34 @@ class UIController {
     }
 
     // Animation controls
-    populateAnimationList(animations) {
+    populateAnimationList(embeddedAnimations, proceduralAnimations) {
         this.elements.animationSelect.innerHTML = '<option value="-1">No Animation</option>';
 
-        animations.forEach((anim, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = anim.name || `Animation ${index + 1}`;
-            this.elements.animationSelect.appendChild(option);
-        });
+        // Add embedded animations if present
+        if (embeddedAnimations && embeddedAnimations.length > 0) {
+            const embeddedGroup = document.createElement('optgroup');
+            embeddedGroup.label = 'Model Animations';
+            embeddedAnimations.forEach((anim, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = anim.name || `Animation ${index + 1}`;
+                embeddedGroup.appendChild(option);
+            });
+            this.elements.animationSelect.appendChild(embeddedGroup);
+        }
+
+        // Add procedural animations (always available)
+        if (proceduralAnimations && proceduralAnimations.length > 0) {
+            const proceduralGroup = document.createElement('optgroup');
+            proceduralGroup.label = 'Standard Animations';
+            proceduralAnimations.forEach((anim, index) => {
+                const option = document.createElement('option');
+                option.value = 1000 + index; // Offset to distinguish from embedded
+                option.textContent = anim.name;
+                proceduralGroup.appendChild(option);
+            });
+            this.elements.animationSelect.appendChild(proceduralGroup);
+        }
 
         this.elements.animationSelect.disabled = false;
         this.elements.animationTime.disabled = false;
@@ -157,6 +206,14 @@ class UIController {
         return parseFloat(this.elements.lightIntensity.value);
     }
 
+    getDirectionCount() {
+        return parseInt(this.elements.directionCount.value);
+    }
+
+    getAnimationFrames() {
+        return parseInt(this.elements.animationFrames.value);
+    }
+
     getSelectedAnimation() {
         return parseInt(this.elements.animationSelect.value);
     }
@@ -173,16 +230,36 @@ class UIController {
         sprites.forEach(sprite => {
             const item = document.createElement('div');
             item.className = 'sprite-item';
-            item.innerHTML = `
-                <img src="${sprite.data}" alt="${sprite.name}">
-                <p>${sprite.name}</p>
-            `;
+
+            const img = document.createElement('img');
+            img.src = sprite.data;
+            img.alt = sprite.name;
+            img.addEventListener('click', () => {
+                this.showSpriteModal(sprite.data, sprite.name);
+            });
+
+            const caption = document.createElement('p');
+            caption.textContent = sprite.name;
+
+            item.appendChild(img);
+            item.appendChild(caption);
             this.elements.spritePreview.appendChild(item);
         });
     }
 
     hideSpritePreview() {
         this.elements.spritePreview.style.display = 'none';
+    }
+
+    // Sprite modal
+    showSpriteModal(imageSrc, caption) {
+        this.elements.modalImage.src = imageSrc;
+        this.elements.modalCaption.textContent = caption;
+        this.elements.spriteModal.style.display = 'block';
+    }
+
+    closeSpriteModal() {
+        this.elements.spriteModal.style.display = 'none';
     }
 
     // Event listener helpers
