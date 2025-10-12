@@ -20,6 +20,8 @@ class UIController {
             distanceValue: document.getElementById('distanceValue'),
             cameraHeight: document.getElementById('cameraHeight'),
             heightValue: document.getElementById('heightValue'),
+            lightIntensity: document.getElementById('lightIntensity'),
+            lightValue: document.getElementById('lightValue'),
             spriteSize: document.getElementById('spriteSize')
         };
     }
@@ -134,6 +136,10 @@ class UIController {
         this.elements.heightValue.textContent = height.toFixed(1);
     }
 
+    updateLightIntensity(intensity) {
+        this.elements.lightValue.textContent = intensity.toFixed(1);
+    }
+
     // Get input values
     getSpriteSize() {
         return parseInt(this.elements.spriteSize.value);
@@ -145,6 +151,10 @@ class UIController {
 
     getCameraHeight() {
         return parseFloat(this.elements.cameraHeight.value);
+    }
+
+    getLightIntensity() {
+        return parseFloat(this.elements.lightIntensity.value);
     }
 
     getSelectedAnimation() {
@@ -202,6 +212,10 @@ class UIController {
 
     onCameraHeightChange(callback) {
         this.elements.cameraHeight.addEventListener('input', callback);
+    }
+
+    onLightIntensityChange(callback) {
+        this.elements.lightIntensity.addEventListener('input', callback);
     }
 
     onErrorClose(callback) {

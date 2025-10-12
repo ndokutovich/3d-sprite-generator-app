@@ -6,43 +6,47 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #2c3e50;
     color: #333;
     min-height: 100vh;
-    padding: 20px;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .container {
-    max-width: 1400px;
-    margin: 0 auto;
+    width: 100%;
+    height: 100vh;
     background: white;
-    border-radius: 15px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 30px;
+    padding: 20px 30px;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .header h1 {
-    font-size: 2em;
-    margin-bottom: 10px;
+    font-size: 1.8em;
+    margin-bottom: 5px;
 }
 
 .header p {
     opacity: 0.9;
-    font-size: 1.1em;
+    font-size: 1em;
 }
 
 .main-content {
     display: grid;
     grid-template-columns: 350px 1fr;
     gap: 0;
-    min-height: 600px;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .controls {
@@ -50,7 +54,18 @@ body {
     padding: 25px;
     border-right: 2px solid #e9ecef;
     overflow-y: auto;
-    max-height: 700px;
+    height: 100%;
+    min-width: 0;
+}
+
+.viewport {
+    background: #2c3e50;
+    position: relative;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
 }
 
 .control-group {
@@ -160,19 +175,10 @@ button:disabled {
     transform: none;
 }
 
-.viewport {
-    background: #2c3e50;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 600px;
-}
-
 #canvas3d {
+    display: block;
     width: 100%;
     height: 100%;
-    display: block;
 }
 
 .loading {
@@ -286,10 +292,12 @@ button:disabled {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 10px;
-    margin-top: 15px;
     padding: 15px;
     background: white;
-    border-radius: 8px;
+    border-top: 2px solid #e9ecef;
+    max-height: 40vh;
+    overflow-y: auto;
+    flex-shrink: 0;
 }
 
 .sprite-item {

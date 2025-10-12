@@ -21,6 +21,10 @@ class SpriteGenerator {
         // Save original renderer size
         const originalSize = this.threeSetup.getRendererSize();
 
+        // Hide grid and set transparent background for sprite rendering
+        this.threeSetup.hideGrid();
+        this.threeSetup.setTransparentBackground();
+
         // Set sprite size
         this.uiController.updateProgress(10, 'Preparing renderer...');
         this.threeSetup.setRendererSize(spriteSize, spriteSize);
@@ -28,10 +32,14 @@ class SpriteGenerator {
         // Generate sprites
         await this.generateDirectionalSprites(distance, height);
 
-        // Restore original size
+        // Restore original size and settings
         this.uiController.updateProgress(95, 'Restoring view...');
         this.threeSetup.setRendererSize(originalSize.width, originalSize.height);
         this.threeSetup.onWindowResize();
+
+        // Restore grid and opaque background
+        this.threeSetup.showGrid();
+        this.threeSetup.setOpaqueBackground();
 
         this.uiController.updateProgress(100, 'Complete!');
 
@@ -51,10 +59,21 @@ class SpriteGenerator {
     async generateDirectionalSprites(distance, height) {
         const directions = CONFIG.DIRECTIONS;
         let currentIndex = 0;
+        const spriteSize = this.uiController.getSpriteSize();
+
+        // Save original camera aspect ratio
+        const originalAspect = this.threeSetup.camera.aspect;
+
+        // Set camera aspect to 1:1 for square sprites
+        this.threeSetup.camera.aspect = 1.0;
+        this.threeSetup.camera.updateProjectionMatrix();
 
         return new Promise((resolve) => {
             const generateNextSprite = () => {
                 if (currentIndex >= directions.length) {
+                    // Restore original aspect ratio
+                    this.threeSetup.camera.aspect = originalAspect;
+                    this.threeSetup.camera.updateProjectionMatrix();
                     resolve();
                     return;
                 }

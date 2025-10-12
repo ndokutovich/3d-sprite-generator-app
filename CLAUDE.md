@@ -22,21 +22,111 @@ Then navigate to `http://localhost:8000` in your browser.
 
 ## Architecture
 
-The application follows a clean architecture pattern with clear separation of concerns:
+The application follows a **clean architecture pattern** with clear separation of concerns, organized into distinct layers with unidirectional dependencies.
 
-### Dependency Chain
+### File Structure
 ```
-app.js (orchestrator)
-  ↓
-├── ui-controller.js (presentation layer)
-├── three-setup.js (3D scene management)
-├── model-loader.js (model parsing)
-├── animation-controller.js (animation state)
-├── sprite-generator.js (rendering logic)
-└── file-handler.js (I/O operations)
-  ↓
-config.js (constants)
+3d-sprite-generator-app/
+├── index.html              # Main HTML structure
+├── styles.css              # All application styles
+└── js/
+    ├── config.js           # ⚙️  Configuration Layer
+    ├── ui-controller.js    # 🎨 Presentation Layer
+    ├── three-setup.js      # 🎬 Infrastructure Layer (3D Engine)
+    ├── model-loader.js     # 📦 Domain Layer (Business Logic)
+    ├── animation-controller.js  # 📦 Domain Layer
+    ├── sprite-generator.js # 📦 Domain Layer
+    ├── file-handler.js     # 💾 Infrastructure Layer (I/O)
+    └── app.js              # 🚀 Application Layer (Orchestrator)
 ```
+
+### Layered Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    APPLICATION LAYER                        │
+│                      app.js                                 │
+│  • Orchestrates all modules                                 │
+│  • Manages application lifecycle                            │
+│  • Runs animation loop                                      │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│                   PRESENTATION LAYER                        │
+│                   ui-controller.js                          │
+│  • DOM manipulation and event handling                      │
+│  • User input collection                                    │
+│  • Visual feedback (loading, progress, errors)              │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│                     DOMAIN LAYER                            │
+│  ┌──────────────────┐  ┌────────────────────┐             │
+│  │  model-loader    │  │ animation-ctrl     │             │
+│  │  • Load models   │  │ • Animation state  │             │
+│  │  • Parse formats │  │ • Mixer management │             │
+│  └──────────────────┘  └────────────────────┘             │
+│                                                              │
+│  ┌──────────────────────────────────────────┐             │
+│  │       sprite-generator                   │             │
+│  │       • Sprite rendering logic           │             │
+│  │       • Camera positioning               │             │
+│  │       • Frame capture                    │             │
+│  └──────────────────────────────────────────┘             │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│                 INFRASTRUCTURE LAYER                        │
+│  ┌──────────────────┐        ┌──────────────────┐         │
+│  │   three-setup    │        │   file-handler   │         │
+│  │   • Scene mgmt   │        │   • File I/O     │         │
+│  │   • Rendering    │        │   • ZIP creation │         │
+│  │   • Camera/Light │        │   • Downloads    │         │
+│  └──────────────────┘        └──────────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│                   CONFIGURATION LAYER                       │
+│                       config.js                             │
+│  • Constants and default values                             │
+│  • No dependencies on other modules                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow & Module Interactions
+
+```
+User Action (UI Event)
+        ↓
+   ui-controller ─────→ app.js (handles event)
+                          ↓
+                    ┌─────┴─────┐
+                    ↓           ↓
+            Domain Layer    Infrastructure Layer
+            (Business)      (Technical)
+                    ↓           ↓
+                    └─────┬─────┘
+                          ↓
+                   ui-controller (updates display)
+                          ↓
+                    User sees result
+```
+
+### Dependency Rules
+
+1. **Outer layers depend on inner layers, never the reverse**
+   - `app.js` depends on all modules
+   - Domain layer (model-loader, sprite-generator) depends on infrastructure
+   - Infrastructure (three-setup, file-handler) depends on config
+   - Config has no dependencies
+
+2. **Cross-layer communication flows through app.js**
+   - UI events → app.js → domain/infrastructure
+   - Results → app.js → ui-controller → display
+
+3. **No direct dependencies between domain modules**
+   - model-loader, animation-controller, sprite-generator are independent
+   - Coordinated only through app.js
 
 ### Module Responsibilities
 
@@ -96,6 +186,57 @@ config.js (constants)
 - Updates animations and rotates model each frame
 - Entry point executes on `DOMContentLoaded`
 
+### Interaction Patterns
+
+**Loading a Model (Complete Flow)**
+```
+User selects file
+    ↓
+ui-controller.onFileSelect() → app.handleFileSelect()
+    ↓
+file-handler.readFile(file) → returns {contents, extension}
+    ↓
+model-loader.loadModel(contents, extension)
+    ↓
+three-setup.addModel(model) + three-setup.centerAndScaleModel()
+    ↓
+animation-controller.setAnimations(animations)
+    ↓
+ui-controller.enableGenerateButton() + ui-controller.hideLoading()
+```
+
+**Generating Sprites (Complete Flow)**
+```
+User clicks Generate
+    ↓
+ui-controller.onGenerateClick() → app.handleGenerateSprites()
+    ↓
+sprite-generator.generateSprites()
+    ├─ gets settings from ui-controller
+    ├─ sets renderer size via three-setup
+    ├─ loops through CONFIG.DIRECTIONS
+    │   ├─ positions camera via three-setup
+    │   ├─ renders scene via three-setup
+    │   └─ captures frame via three-setup
+    ├─ restores renderer size
+    └─ returns sprites array
+    ↓
+ui-controller.displaySprites(sprites) + ui-controller.enableDownloadButton()
+```
+
+**Animation Loop (Continuous)**
+```
+requestAnimationFrame
+    ↓
+app.animate()
+    ├─ delta = three-setup.getDelta()
+    ├─ animation-controller.update(delta)  // updates mixer
+    ├─ three-setup.rotateModel()           // auto-rotation
+    └─ three-setup.render()                // draws frame
+    ↓
+repeat
+```
+
 ## Key Implementation Details
 
 ### Script Loading Order
@@ -106,36 +247,22 @@ The `index.html` loads scripts in a specific order that must be maintained:
 4. Feature modules (model-loader, animation-controller, sprite-generator, file-handler)
 5. `app.js` (must load last - depends on all modules)
 
-### Model Loading Flow
-1. User selects file → `file-handler.js` reads as ArrayBuffer
-2. ArrayBuffer + extension passed to `model-loader.js`
-3. Model-loader determines format and uses appropriate Three.js loader
-4. Parsed model added to scene via `three-setup.js`
-5. Model is centered and scaled to fit 2-unit space
-6. Animations (if present) passed to `animation-controller.js`
+### Technical Notes
 
-### Sprite Generation Flow
-1. User clicks Generate → `sprite-generator.js` activated
-2. Renderer temporarily resized to `spriteSize × spriteSize`
-3. For each of 8 directions:
-   - Camera positioned at `(sin(angle) * distance, height, cos(angle) * distance)`
-   - Camera looks at origin (0, 0, 0)
-   - Scene rendered
-   - Frame captured as PNG data URL
-4. Renderer restored to original size
-5. Sprites displayed in preview grid
+**Camera Positioning Math**
+- Uses polar coordinates for 8-directional sprite capture
+- Formula: `x = sin(angle) * distance`, `z = cos(angle) * distance`
+- Camera always looks at origin (0, 0, 0) where model is centered
 
-### Animation Loop Pattern
-```javascript
-animate() {
-    requestAnimationFrame(() => this.animate());
+**Model Centering**
+- Models are scaled to fit within 2-unit bounding box
+- Center of bounding box translated to world origin
+- Ensures consistent sprite sizes across different models
 
-    const delta = this.threeSetup.getDelta();
-    this.animationController.update(delta);  // Update animations
-    this.threeSetup.rotateModel();            // Auto-rotate model
-    this.threeSetup.render();                 // Render frame
-}
-```
+**Blob URL Handling**
+- `THREE.ImageLoader` is patched to handle blob: and data: URLs without CORS
+- Prevents texture loading errors when models embed textures
+- Warnings for missing textures are suppressed (non-critical)
 
 ## Extending the Application
 

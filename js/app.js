@@ -23,6 +23,28 @@ class App {
         // Setup error handlers
         this.setupErrorHandlers();
 
+        // Trigger multiple resizes to ensure proper sizing after layout settles
+        setTimeout(() => {
+            this.threeSetup.onWindowResize();
+        }, 50);
+
+        setTimeout(() => {
+            this.threeSetup.onWindowResize();
+        }, 250);
+
+        setTimeout(() => {
+            this.threeSetup.onWindowResize();
+        }, 500);
+
+        // Add ResizeObserver to handle viewport size changes
+        const viewport = document.querySelector('.viewport');
+        if (viewport) {
+            const resizeObserver = new ResizeObserver(() => {
+                this.threeSetup.onWindowResize();
+            });
+            resizeObserver.observe(viewport);
+        }
+
         // Start animation loop
         this.animate();
     }
@@ -58,6 +80,12 @@ class App {
         this.uiController.onCameraHeightChange((e) => {
             const height = parseFloat(e.target.value);
             this.uiController.updateCameraHeight(height);
+        });
+
+        this.uiController.onLightIntensityChange((e) => {
+            const intensity = parseFloat(e.target.value);
+            this.uiController.updateLightIntensity(intensity);
+            this.threeSetup.setCameraLightIntensity(intensity);
         });
 
         // Error close button
@@ -143,7 +171,10 @@ class App {
             this.animationController.update(delta);
         }
 
-        // Rotate model
+        // Update orbit controls
+        this.threeSetup.updateControls();
+
+        // Rotate model (disabled by default with orbit controls)
         this.threeSetup.rotateModel();
 
         // Render scene
