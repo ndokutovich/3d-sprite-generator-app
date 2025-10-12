@@ -34,11 +34,35 @@
                     <select id="animationSelect" disabled>
                         <option value="-1">No Animation</option>
                     </select>
-                    
+
+                    <div style="margin-top: 15px; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="autoplayAnimation" style="width: auto;">
+                        <label for="autoplayAnimation" style="margin: 0; cursor: pointer;">
+                            ▶️ Autoplay Animation
+                        </label>
+                    </div>
+
+                    <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="lockPosition" style="width: auto;">
+                        <label for="lockPosition" style="margin: 0; cursor: pointer;">
+                            📍 Lock Position (Stay in Place)
+                        </label>
+                    </div>
+
                     <label for="animationTime" style="margin-top: 15px;">
                         Animation Time: <span class="range-value" id="timeValue">0.0s</span>
                     </label>
                     <input type="range" id="animationTime" min="0" max="1" step="0.01" value="0" disabled>
+
+                    <div style="margin-top: 15px;">
+                        <div class="file-input-wrapper">
+                            <input type="file" id="animationFile" accept=".fbx,.glb,.gltf">
+                            <label for="animationFile" class="file-input-label">Upload Animation (FBX/GLB)</label>
+                        </div>
+                        <div class="info-box" style="margin-top: 10px;">
+                            Upload Mixamo animations or custom skeletal animations. Skeleton must match your model.
+                        </div>
+                    </div>
 
                     <label for="animationFrames" style="margin-top: 15px;">
                         Animation Frames (for sprite generation):
@@ -122,6 +146,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <!-- fflate is required for FBX loader to decompress FBX files -->
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.7.4/umd/index.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
@@ -132,6 +158,7 @@
     <!-- Utility classes (no dependencies) -->
     <script src="js/sprite.js"></script>
     <script src="js/animation-frame-calculator.js"></script>
+    <script src="js/animation-library.js"></script>
     <!-- Core modules -->
     <script src="js/ui-controller.js"></script>
     <script src="js/three-setup.js"></script>

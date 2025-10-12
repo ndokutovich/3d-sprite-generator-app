@@ -28,7 +28,9 @@ class UIController {
             modalCaption: document.getElementById('modalCaption'),
             modalClose: document.getElementById('modalClose'),
             directionCount: document.getElementById('directionCount'),
-            animationFrames: document.getElementById('animationFrames')
+            animationFrames: document.getElementById('animationFrames'),
+            autoplayAnimation: document.getElementById('autoplayAnimation'),
+            lockPosition: document.getElementById('lockPosition')
         };
 
         // Setup modal close handlers
@@ -125,13 +127,13 @@ class UIController {
     }
 
     // Animation controls
-    populateAnimationList(embeddedAnimations, proceduralAnimations) {
+    populateAnimationList(embeddedAnimations, libraryAnimations, proceduralAnimations) {
         this.elements.animationSelect.innerHTML = '<option value="-1">No Animation</option>';
 
         // Add embedded animations if present
         if (embeddedAnimations && embeddedAnimations.length > 0) {
             const embeddedGroup = document.createElement('optgroup');
-            embeddedGroup.label = 'Model Animations';
+            embeddedGroup.label = '📦 Model Animations';
             embeddedAnimations.forEach((anim, index) => {
                 const option = document.createElement('option');
                 option.value = index;
@@ -141,10 +143,24 @@ class UIController {
             this.elements.animationSelect.appendChild(embeddedGroup);
         }
 
+        // Add library animations (Mixamo, uploaded)
+        if (libraryAnimations && libraryAnimations.length > 0) {
+            const libraryGroup = document.createElement('optgroup');
+            libraryGroup.label = '📚 Animation Library';
+            libraryAnimations.forEach((anim, index) => {
+                const option = document.createElement('option');
+                option.value = CONFIG.ANIMATION.LIBRARY_INDEX_OFFSET + index;
+                const icon = anim.source === 'uploaded' ? '⬆️' : '🎭';
+                option.textContent = `${icon} ${anim.name}`;
+                libraryGroup.appendChild(option);
+            });
+            this.elements.animationSelect.appendChild(libraryGroup);
+        }
+
         // Add procedural animations (always available)
         if (proceduralAnimations && proceduralAnimations.length > 0) {
             const proceduralGroup = document.createElement('optgroup');
-            proceduralGroup.label = 'Standard Animations';
+            proceduralGroup.label = '⚙️ Procedural Animations';
             proceduralAnimations.forEach((anim, index) => {
                 const option = document.createElement('option');
                 option.value = CONFIG.ANIMATION.PROCEDURAL_INDEX_OFFSET + index;
@@ -248,6 +264,22 @@ class UIController {
         return isNaN(value) ? 0 : Math.max(0, value);
     }
 
+    isAutoplayEnabled() {
+        return this.elements.autoplayAnimation.checked;
+    }
+
+    setAutoplayEnabled(enabled) {
+        this.elements.autoplayAnimation.checked = enabled;
+    }
+
+    isLockPositionEnabled() {
+        return this.elements.lockPosition.checked;
+    }
+
+    setLockPositionEnabled(enabled) {
+        this.elements.lockPosition.checked = enabled;
+    }
+
     // Sprite preview
     displaySprites(sprites) {
         this.elements.spritePreview.innerHTML = '';
@@ -297,6 +329,10 @@ class UIController {
         document.getElementById('modelFile').addEventListener('change', callback);
     }
 
+    onAnimationFileSelect(callback) {
+        document.getElementById('animationFile').addEventListener('change', callback);
+    }
+
     onGenerateClick(callback) {
         this.elements.generateBtn.addEventListener('click', callback);
     }
@@ -311,6 +347,14 @@ class UIController {
 
     onAnimationTimeChange(callback) {
         this.elements.animationTime.addEventListener('input', callback);
+    }
+
+    onAutoplayToggle(callback) {
+        this.elements.autoplayAnimation.addEventListener('change', callback);
+    }
+
+    onLockPositionToggle(callback) {
+        this.elements.lockPosition.addEventListener('change', callback);
     }
 
     onCameraDistanceChange(callback) {

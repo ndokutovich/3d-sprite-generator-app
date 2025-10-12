@@ -116,6 +116,7 @@ const CONFIG = {
 
     ANIMATION: {
         PROCEDURAL_INDEX_OFFSET: 1000, // Offset to distinguish procedural from embedded animations
+        LIBRARY_INDEX_OFFSET: 2000,    // Offset for library animations (Mixamo, uploaded)
         NO_ANIMATION: -1
     }
 };

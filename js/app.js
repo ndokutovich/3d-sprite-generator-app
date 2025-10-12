@@ -4,8 +4,9 @@ class App {
         // Initialize all controllers
         this.uiController = new UIController();
         this.threeSetup = new ThreeSetup();
+        this.animationLibrary = new AnimationLibrary();
         this.modelLoader = new ModelLoader(this.threeSetup, this.uiController);
-        this.animationController = new AnimationController(this.threeSetup, this.uiController);
+        this.animationController = new AnimationController(this.threeSetup, this.uiController, this.animationLibrary);
         this.spriteGenerator = new SpriteGenerator(this.threeSetup, this.uiController, this.animationController);
         this.fileHandler = new FileHandler(this.uiController);
 
@@ -13,9 +14,14 @@ class App {
         this.init();
     }
 
-    init() {
+    async init() {
         // Initialize Three.js scene
         this.threeSetup.initScene('canvas3d');
+
+        // Preload animation library (optional - won't block if files don't exist)
+        await this.animationLibrary.preloadLibraryAnimations().catch(() => {
+            console.log('No animations folder found - animations can be uploaded manually');
+        });
 
         // Setup event listeners
         this.setupEventListeners();
@@ -53,6 +59,9 @@ class App {
         // File selection
         this.uiController.onFileSelect((e) => this.handleFileSelect(e));
 
+        // Animation file upload
+        this.uiController.onAnimationFileSelect((e) => this.handleAnimationFileSelect(e));
+
         // Generate sprites button
         this.uiController.onGenerateClick(() => this.handleGenerateSprites());
 
@@ -69,6 +78,16 @@ class App {
             const time = parseFloat(e.target.value);
             this.uiController.updateAnimationTime(time);
             this.animationController.setAnimationTime(time);
+        });
+
+        this.uiController.onAutoplayToggle((e) => {
+            const enabled = e.target.checked;
+            this.animationController.setAutoplay(enabled);
+        });
+
+        this.uiController.onLockPositionToggle((e) => {
+            const enabled = e.target.checked;
+            this.animationController.setLockPosition(enabled);
         });
 
         // Camera controls
@@ -153,6 +172,38 @@ class App {
         }
     }
 
+    async handleAnimationFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            this.uiController.showLoading('Loading animation...', 0);
+
+            await this.animationLibrary.loadAnimationFromFile(file);
+
+            this.uiController.showSuccessMessage();
+            this.uiController.updateProgress(100, 'Animation loaded!');
+
+            // Refresh animation list
+            const model = this.threeSetup.getLoadedModel();
+            if (model) {
+                this.animationController.setAnimations(this.animationController.getAnimations());
+            }
+
+            setTimeout(() => {
+                this.uiController.hideSuccessMessage();
+                this.uiController.hideLoading();
+            }, 2000);
+
+        } catch (error) {
+            console.error('Error loading animation:', error);
+            this.uiController.showError('Failed to load animation: ' + error.message);
+        }
+
+        // Clear file input for re-upload
+        e.target.value = '';
+    }
+
     async handleDownloadZip() {
         try {
             const sprites = this.spriteGenerator.getGeneratedSprites();
@@ -184,5 +235,6 @@ class App {
 
 // Initialize the application when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    new App();
+    window.app = new App();
+    console.log('✅ App loaded! Try: app.animationController.analyzeAnimation(2000)');
 });
