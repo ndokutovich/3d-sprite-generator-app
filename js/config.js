@@ -69,18 +69,6 @@ const CONFIG = {
         { name: 'SSW', angle: 15 * Math.PI / 8 }
     ],
 
-    // Keep DIRECTIONS for backwards compatibility (defaults to 8)
-    DIRECTIONS: [
-        { name: 'South', angle: 0 },
-        { name: 'South-East', angle: Math.PI / 4 },
-        { name: 'East', angle: Math.PI / 2 },
-        { name: 'North-East', angle: 3 * Math.PI / 4 },
-        { name: 'North', angle: Math.PI },
-        { name: 'North-West', angle: 5 * Math.PI / 4 },
-        { name: 'West', angle: 3 * Math.PI / 2 },
-        { name: 'South-West', angle: 7 * Math.PI / 4 }
-    ],
-
     PROGRESS: {
         READ_FILE_START: 0,
         READ_FILE_END: 50,

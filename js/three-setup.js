@@ -18,10 +18,6 @@ class ThreeSetup {
     }
 
     setupLoadingManager() {
-        this.loadingManager.onStart = function(url, itemsLoaded, itemsTotal) {
-            console.log('Loading:', url);
-        };
-
         this.loadingManager.onError = function(url) {
             console.warn('Loading error (non-critical):', url);
         };
@@ -65,9 +61,6 @@ class ThreeSetup {
         const width = rect.width || viewport.clientWidth || viewport.offsetWidth;
         const height = rect.height || viewport.clientHeight || viewport.offsetHeight;
 
-        console.log('Viewport dimensions:', width, height);
-        console.log('Viewport rect:', rect);
-
         // Create scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(CONFIG.SCENE.BACKGROUND_COLOR);
@@ -109,9 +102,6 @@ class ThreeSetup {
         this.renderer.shadowMap.enabled = true;
         this.renderer.setViewport(0, 0, width, height);
         this.renderer.setClearColor(CONFIG.SCENE.BACKGROUND_COLOR, 1); // Opaque by default
-
-        console.log('Canvas actual size:', canvas.width, canvas.height);
-        console.log('Canvas style:', canvas.style.width, canvas.style.height);
 
         // Setup lighting
         this.setupLighting();
@@ -176,9 +166,6 @@ class ThreeSetup {
         const rect = viewport.getBoundingClientRect();
         const width = rect.width || viewport.clientWidth || viewport.offsetWidth;
         const height = rect.height || viewport.clientHeight || viewport.offsetHeight;
-
-        console.log('Resize - Viewport dimensions:', width, height);
-        console.log('Resize - Viewport rect:', rect);
 
         if (width > 0 && height > 0) {
             this.camera.aspect = width / height;
