@@ -258,6 +258,20 @@ class ThreeSetup {
         this.camera.lookAt(x, y, z);
     }
 
+    // Get current camera position relative to target
+    getCurrentCameraDistance() {
+        if (this.controls) {
+            // Calculate distance from camera to controls target
+            return this.camera.position.distanceTo(this.controls.target);
+        }
+        // Fallback: distance from camera to origin
+        return this.camera.position.length();
+    }
+
+    getCurrentCameraHeight() {
+        return this.camera.position.y;
+    }
+
     captureFrame() {
         return this.renderer.domElement.toDataURL('image/png');
     }

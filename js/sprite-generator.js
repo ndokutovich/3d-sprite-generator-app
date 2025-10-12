@@ -15,8 +15,12 @@ class SpriteGenerator {
         this.generatedSprites = [];
 
         const spriteSize = this.uiController.getSpriteSize();
-        const distance = this.uiController.getCameraDistance();
-        const height = this.uiController.getCameraHeight();
+        // Use actual current camera position instead of slider values
+        const distance = this.threeSetup.getCurrentCameraDistance();
+        const height = this.threeSetup.getCurrentCameraHeight();
+
+        // Save original camera position
+        const originalCameraPosition = this.threeSetup.camera.position.clone();
 
         // Save original renderer size
         const originalSize = this.threeSetup.getRendererSize();
@@ -36,6 +40,13 @@ class SpriteGenerator {
         this.uiController.updateProgress(95, 'Restoring view...');
         this.threeSetup.setRendererSize(originalSize.width, originalSize.height);
         this.threeSetup.onWindowResize();
+
+        // Restore camera position
+        this.threeSetup.setCameraPosition(
+            originalCameraPosition.x,
+            originalCameraPosition.y,
+            originalCameraPosition.z
+        );
 
         // Restore grid and opaque background
         this.threeSetup.showGrid();
