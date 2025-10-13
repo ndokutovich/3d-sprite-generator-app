@@ -737,50 +737,6 @@ class EquipmentManager {
                 name: 'Standard L_/R_ Prefix Rig',
                 signature: ['Root', 'Pelvis', 'L_Thigh', 'L_Calf', 'L_Hand', 'R_Hand'],
 
-                // Axis correction for this rig type
-                // Mixamo uses centimeters, most game engines use meters
-                axisCorrection: {
-                    // Scale factor to convert Mixamo units to your rig's units
-                    // Mixamo is in centimeters, divide by 100 for meters
-                    positionScale: 0.01, // cm to meters (1/100)
-
-                    // Per-bone rotation offsets (in degrees)
-                    // Iteration 2 - BEST RESULT ("now its a bit better - still broken, but only via torso")
-                    boneRotationOffsets: {
-                        // Torso (first pass)
-                        'Pelvis': { x: -131, y: -52, z: -145 },
-                        'Waist': { x: -122, y: -31, z: -147 },
-
-                        // Legs (iteration 2)
-                        'L_Thigh': { x: 97, y: -8, z: 149 },
-                        'R_Thigh': { x: 96, y: -2, z: 130 },
-                        'L_Calf': { x: 93, y: -3, z: 4 },
-                        'R_Calf': { x: 85, y: 5, z: 12 },
-                        'L_Foot': { x: 37, y: -3, z: 23 },
-                        'R_Foot': { x: 16, y: -11, z: 8 },
-
-                        // Shoulders (iteration 2 refinement)
-                        'L_Clavicle': { x: -19, y: -18, z: 50 },
-                        'R_Clavicle': { x: -22, y: -1, z: 276 },
-
-                        // Arms (iteration 2)
-                        'L_Upperarm': { x: 17, y: 1, z: -167 },
-                        'R_Upperarm': { x: 12, y: -40, z: 150 },
-                        'R_Forearm': { x: 16, y: -12, z: 88 },
-
-                        // Hands
-                        'L_Hand': { x: 168, y: 70, z: -171 },
-
-                        // Head
-                        'Head': { x: 32, y: -11, z: 8 }
-                    },
-
-                    // Global rotation offset for ROOT/PELVIS bone (in degrees)
-                    // Model does "back bend/bridge" pose when Mixamo applied
-                    // Try X-axis 180° flip
-                    globalRotationOffset: { x: 180, y: 0, z: 0 }
-                },
-
                 mapping: {
                     // Core
                     'Root': null, // Root bone, no Mixamo equivalent
@@ -869,6 +825,7 @@ class EquipmentManager {
             if (matchPercent >= 80) {
                 console.log(`✅ Detected rig type: ${preset.name}`);
                 console.log(`   Signature match: ${signatureMatches}/${preset.signature.length} bones (${matchPercent.toFixed(0)}%)`);
+                console.log(`   💡 This preset provides bone name mapping only (no transformation fixes)`);
                 return { id: presetId, ...preset };
             }
         }

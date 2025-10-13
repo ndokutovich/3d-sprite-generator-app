@@ -16,8 +16,6 @@ class AnimationController {
         this.lockPosition = false;
         this.lockedPosition = null; // Position to lock model at during animation
         this.lockedChildPositions = new Map(); // Map of object UUID -> locked position for all objects in hierarchy
-        this.boneMapping = null; // Mapping from Mixamo bone names to custom rig bone names
-        this.axisCorrection = null; // Axis correction settings from preset (scale, rotation, position remapping)
     }
 
     setAnimations(animations) {
@@ -27,9 +25,6 @@ class AnimationController {
         if (model) {
             // Save original model transform for procedural animations
             this.saveOriginalTransform();
-
-            // Generate bone mapping for animation retargeting (custom rigs)
-            this.generateBoneMapping();
 
             // Setup mixer for embedded animations if present
             if (animations && animations.length > 0) {
@@ -80,44 +75,6 @@ class AnimationController {
         // Restore original transform
         this.restoreOriginalTransform();
 
-        // Apply coordinate system correction to ROOT BONE if using retargeted animations
-        if (this.axisCorrection && this.axisCorrection.globalRotationOffset && index >= 0) {
-            const model = this.threeSetup.getLoadedModel();
-            if (model) {
-                const rot = this.axisCorrection.globalRotationOffset;
-
-                // Find root bone (Root or Hip)
-                let rootBone = null;
-                model.traverse((child) => {
-                    if (child.isBone && (child.name === 'Root' || child.name === 'Hip')) {
-                        if (!rootBone || child.name === 'Root') {
-                            rootBone = child;
-                        }
-                    }
-                });
-
-                if (rootBone) {
-                    // Apply rotation to root bone
-                    const euler = new THREE.Euler(
-                        rot.x * Math.PI / 180,
-                        rot.y * Math.PI / 180,
-                        rot.z * Math.PI / 180,
-                        'XYZ'
-                    );
-                    rootBone.rotation.copy(euler);
-                    console.log(`🔄 Applied rotation to ${rootBone.name}: (${rot.x}°, ${rot.y}°, ${rot.z}°)`);
-                } else {
-                    // Fallback: apply to model
-                    model.rotation.set(
-                        rot.x * Math.PI / 180,
-                        rot.y * Math.PI / 180,
-                        rot.z * Math.PI / 180
-                    );
-                    console.log(`🔄 Applied model rotation: (${rot.x}°, ${rot.y}°, ${rot.z}°)`);
-                }
-            }
-        }
-
         // Check if it's a library animation (Mixamo, uploaded)
         if (index >= CONFIG.ANIMATION.LIBRARY_INDEX_OFFSET) {
             const libraryIndex = index - CONFIG.ANIMATION.LIBRARY_INDEX_OFFSET;
@@ -132,13 +89,7 @@ class AnimationController {
 
                     const libraryAnim = libraryAnimations[libraryIndex];
 
-                    // Retarget animation if we have a bone mapping (custom rig)
-                    let clipToPlay = libraryAnim.clip;
-                    if (this.boneMapping && Object.keys(this.boneMapping).length > 0) {
-                        clipToPlay = this.retargetAnimation(libraryAnim.clip);
-                    }
-
-                    this.currentAnimationAction = this.mixer.clipAction(clipToPlay);
+                    this.currentAnimationAction = this.mixer.clipAction(libraryAnim.clip);
                     this.currentAnimationAction.play();
                     this.currentAnimationAction.paused = !this.autoplay;
 
@@ -573,539 +524,9 @@ class AnimationController {
         console.log('=========================\n');
     }
 
-    /**
-     * Auto-detect and generate bone mapping for animation retargeting
-     * Called when model is loaded
-     */
-    generateBoneMapping() {
-        if (!this.equipmentManager) {
-            console.warn('⚠️ Equipment manager not available for bone mapping');
-            return;
-        }
-
-        const analysis = this.equipmentManager.analyzeSkeleton();
-        if (!analysis) {
-            console.warn('⚠️ No skeleton found for bone mapping');
-            return;
-        }
-
-        // If it's already a Mixamo rig, no mapping needed
-        if (analysis.isMixamo) {
-            console.log('✅ Mixamo rig detected - no retargeting needed');
-            this.boneMapping = null;
-            return;
-        }
-
-        // PRIORITY 1: Try to load manual mapping from localStorage
-        const manualMapping = this.equipmentManager.getManualMappingForAnimations();
-        if (manualMapping && Object.keys(manualMapping).length > 0) {
-            this.boneMapping = manualMapping;
-            console.log('🗺️ Using MANUAL bone mapping from localStorage:');
-            console.log(`   Mapped ${Object.keys(this.boneMapping).length} bones`);
-            console.log('   Mixamo animations will use your saved custom mapping');
-            return this.boneMapping;
-        }
-
-        // PRIORITY 2: Check for preset rig types (100% accurate hardcoded mappings)
-        const presetRig = this.equipmentManager.detectPresetRigType();
-        if (presetRig && presetRig.mapping) {
-            // Invert the preset mapping: Mixamo name -> Custom name
-            this.boneMapping = {};
-            for (const [customBoneName, mixamoBoneName] of Object.entries(presetRig.mapping)) {
-                if (mixamoBoneName) { // Skip null mappings (twist bones, etc.)
-                    this.boneMapping[mixamoBoneName] = customBoneName;
-                }
-            }
-
-            // Store axis correction info for use during retargeting
-            this.axisCorrection = presetRig.axisCorrection || null;
-
-            console.log(`🗺️ Using PRESET bone mapping: ${presetRig.name}`);
-            console.log(`   Mapped ${Object.keys(this.boneMapping).length} bones (100% accuracy)`);
-            if (this.axisCorrection && this.axisCorrection.positionScale) {
-                console.log(`   Position scale: ${this.axisCorrection.positionScale} (converting Mixamo cm to meters)`);
-            }
-            console.log('   Mixamo animations will be perfectly retargeted!');
-            return this.boneMapping;
-        }
-
-        // PRIORITY 3: Fall back to auto-mapping (fuzzy matching)
-        const mappingResult = this.equipmentManager.autoMapToMixamo();
-
-        if (!mappingResult || Object.keys(mappingResult.mapping).length === 0) {
-            console.warn('⚠️ Could not generate bone mapping');
-            this.boneMapping = null;
-            return;
-        }
-
-        // Invert the mapping: Mixamo name -> Custom name
-        this.boneMapping = {};
-        for (const [customBoneName, data] of Object.entries(mappingResult.mapping)) {
-            const mixamoBoneName = data.mixamoBone;
-            this.boneMapping[mixamoBoneName] = customBoneName;
-        }
-
-        console.log('🗺️ Using AUTO bone mapping for animation retargeting:');
-        console.log(`   Mapped ${Object.keys(this.boneMapping).length} bones (${mappingResult.matchRate} match rate)`);
-        console.log('   💡 Use Manual Mapping tab in Bone Viewer to improve accuracy');
-
-        return this.boneMapping;
-    }
 
     /**
-     * Retarget animation clip from Mixamo bone names to custom rig bone names
-     * @param {THREE.AnimationClip} clip - Original animation clip
-     * @returns {THREE.AnimationClip} New clip with retargeted bone names
-     */
-    retargetAnimation(clip) {
-        if (!this.boneMapping || Object.keys(this.boneMapping).length === 0) {
-            // No mapping, return original clip
-            return clip;
-        }
-
-        const newTracks = [];
-        let remappedCount = 0;
-        let skippedCount = 0;
-
-        for (const track of clip.tracks) {
-            // Track name format: "boneName.property" or "mixamorig:boneName.property"
-            let trackName = track.name;
-            let newTrackName = trackName;
-
-            // Extract bone name and property
-            // Examples: "mixamorig:Hips.position", "LeftArm.quaternion", "RightHand.position"
-            const dotIndex = trackName.lastIndexOf('.');
-            if (dotIndex > 0) {
-                const bonePart = trackName.substring(0, dotIndex);
-                const property = trackName.substring(dotIndex); // includes the dot
-
-                // Remove "mixamorig:" prefix if present
-                const cleanBoneName = bonePart.replace('mixamorig:', '').replace('mixamorig', '');
-
-                // Check if we have a mapping for this bone
-                if (this.boneMapping[cleanBoneName]) {
-                    const customBoneName = this.boneMapping[cleanBoneName];
-                    newTrackName = customBoneName + property;
-                    remappedCount++;
-                } else {
-                    // No mapping found - keep original name but log it
-                    skippedCount++;
-                }
-            }
-
-            // Apply axis correction if needed (scale position values)
-            let trackValues = track.values;
-            const isPositionTrack = trackName.includes('.position');
-            const isQuaternionTrack = trackName.includes('.quaternion');
-
-            if (isPositionTrack && this.axisCorrection && this.axisCorrection.positionScale) {
-                // Scale position values (Mixamo is in cm, convert to meters)
-                const scale = this.axisCorrection.positionScale;
-                trackValues = new Float32Array(track.values.length);
-                for (let i = 0; i < track.values.length; i++) {
-                    trackValues[i] = track.values[i] * scale;
-                }
-            }
-
-            // Apply per-bone rotation offsets to quaternion tracks
-            if (isQuaternionTrack && this.axisCorrection) {
-                // FIRST: Invert quaternions if globalRotationOffset exists (fixes inverted bone axes)
-                if (this.axisCorrection.globalRotationOffset) {
-                    const rot = this.axisCorrection.globalRotationOffset;
-                    const invertEuler = new THREE.Euler(
-                        rot.x * Math.PI / 180,
-                        rot.y * Math.PI / 180,
-                        rot.z * Math.PI / 180,
-                        'XYZ'
-                    );
-                    const invertQuat = new THREE.Quaternion().setFromEuler(invertEuler);
-
-                    trackValues = new Float32Array(track.values.length);
-                    const tempQuat = new THREE.Quaternion();
-
-                    for (let i = 0; i < track.values.length; i += 4) {
-                        tempQuat.set(
-                            track.values[i],
-                            track.values[i + 1],
-                            track.values[i + 2],
-                            track.values[i + 3]
-                        );
-
-                        // Pre-multiply: newQuat = invertQuat * originalQuat
-                        tempQuat.premultiply(invertQuat);
-
-                        trackValues[i] = tempQuat.x;
-                        trackValues[i + 1] = tempQuat.y;
-                        trackValues[i + 2] = tempQuat.z;
-                        trackValues[i + 3] = tempQuat.w;
-                    }
-                }
-
-                // SECOND: Apply per-bone offsets (if any)
-                if (this.axisCorrection.boneRotationOffsets) {
-                    // Extract bone name from the NEW track name (after remapping)
-                    const dotIdx = newTrackName.lastIndexOf('.');
-                    if (dotIdx > 0) {
-                        const boneName = newTrackName.substring(0, dotIdx);
-
-                        // Check if this bone has a rotation offset
-                        if (this.axisCorrection.boneRotationOffsets[boneName]) {
-                            const rotOffset = this.axisCorrection.boneRotationOffsets[boneName];
-
-                            // Convert degrees to radians and create offset quaternion
-                            const offsetEuler = new THREE.Euler(
-                                rotOffset.x * Math.PI / 180,
-                                rotOffset.y * Math.PI / 180,
-                                rotOffset.z * Math.PI / 180,
-                                'XYZ'
-                            );
-                            const offsetQuat = new THREE.Quaternion().setFromEuler(offsetEuler);
-
-                            // Use trackValues if already modified by global rotation, otherwise use original
-                            const sourceValues = trackValues || track.values;
-                            trackValues = new Float32Array(sourceValues.length);
-                            const tempQuat = new THREE.Quaternion();
-
-                            for (let i = 0; i < sourceValues.length; i += 4) {
-                                // Read quaternion (either inverted or original)
-                                tempQuat.set(
-                                    sourceValues[i],
-                                    sourceValues[i + 1],
-                                    sourceValues[i + 2],
-                                    sourceValues[i + 3]
-                                );
-
-                                // Apply offset: newQuat = originalQuat * offsetQuat (post-multiply)
-                                tempQuat.multiply(offsetQuat);
-
-                                // Write back
-                                trackValues[i] = tempQuat.x;
-                                trackValues[i + 1] = tempQuat.y;
-                                trackValues[i + 2] = tempQuat.z;
-                                trackValues[i + 3] = tempQuat.w;
-                            }
-
-                            console.log(`   🔧 Applied rotation offset to ${boneName}: (${rotOffset.x}°, ${rotOffset.y}°, ${rotOffset.z}°)`);
-                        }
-                    }
-                }
-            }
-
-            // Create new track with updated name and scaled/offset values
-            const TrackType = track.constructor;
-            const newTrack = new TrackType(
-                newTrackName,
-                track.times,
-                trackValues,
-                track.interpolation
-            );
-
-            newTracks.push(newTrack);
-        }
-
-        console.log(`   🔄 Retargeted animation: ${clip.name}`);
-        console.log(`      Remapped: ${remappedCount} tracks, Kept original: ${skippedCount} tracks`);
-
-        // DEBUG: Log sample track to see what's being animated
-        if (newTracks.length > 0) {
-            const sampleTrack = newTracks.find(t => t.name.includes('position')) || newTracks[0];
-            console.log(`      Sample track: ${sampleTrack.name}`);
-            console.log(`      Track type: ${sampleTrack.constructor.name}`);
-            if (sampleTrack.values && sampleTrack.values.length >= 3) {
-                const scaledNote = (this.axisCorrection && this.axisCorrection.positionScale) ? ' (SCALED)' : '';
-                console.log(`      First values${scaledNote}: [${sampleTrack.values[0].toFixed(3)}, ${sampleTrack.values[1].toFixed(3)}, ${sampleTrack.values[2].toFixed(3)}]`);
-            }
-        }
-
-        // Create new clip with retargeted tracks
-        const retargetedClip = new THREE.AnimationClip(
-            clip.name + '_retargeted',
-            clip.duration,
-            newTracks
-        );
-
-        return retargetedClip;
-    }
-
-    /**
-     * Auto-calculate rest pose offsets by comparing your model's rest pose with Mixamo T-pose
-     * Call this from console: app.animationController.calculateRestPoseOffsets()
-     */
-    calculateRestPoseOffsets() {
-        const model = this.threeSetup.getLoadedModel();
-        const libraryAnimations = this.animationLibrary ? this.animationLibrary.getAnimations() : [];
-
-        if (!model || libraryAnimations.length === 0) {
-            console.log('❌ Need model and library animations loaded');
-            return null;
-        }
-
-        console.log('\n=== 🧬 CALCULATING REST POSE OFFSETS ===\n');
-
-        // Step 1: Capture YOUR model's rest pose (original rotations)
-        const originalRotations = new Map();
-        model.traverse((child) => {
-            if (child.isBone) {
-                originalRotations.set(child.name, child.quaternion.clone());
-            }
-        });
-        console.log(`✅ Captured ${originalRotations.size} bone rotations from YOUR rest pose`);
-
-        // Step 2: Apply Mixamo T-pose (first frame)
-        if (!this.mixer) {
-            this.mixer = new THREE.AnimationMixer(model);
-        }
-
-        const anim = libraryAnimations[0];
-        let clipToPlay = anim.clip;
-        if (this.boneMapping && Object.keys(this.boneMapping).length > 0) {
-            clipToPlay = this.retargetAnimation(anim.clip);
-        }
-
-        const action = this.mixer.clipAction(clipToPlay);
-        action.play();
-        action.paused = true;
-        action.time = 0;
-        this.mixer.update(0);
-
-        console.log('✅ Applied Mixamo T-pose (first frame)');
-
-        // Step 3: Calculate offset between YOUR rest pose and Mixamo result
-        const offsets = {};
-        const tempQuat = new THREE.Quaternion();
-
-        model.traverse((child) => {
-            if (child.isBone && originalRotations.has(child.name)) {
-                const originalQuat = originalRotations.get(child.name);
-                const mixamoQuat = child.quaternion.clone();
-
-                // Calculate inverse offset: offset = original * inverse(mixamo)
-                tempQuat.copy(mixamoQuat).invert();
-                const offsetQuat = originalQuat.clone().multiply(tempQuat);
-
-                // Convert to euler for readability
-                const euler = new THREE.Euler().setFromQuaternion(offsetQuat);
-                const degX = euler.x * 180 / Math.PI;
-                const degY = euler.y * 180 / Math.PI;
-                const degZ = euler.z * 180 / Math.PI;
-
-                // Only save if rotation is significant (> 5 degrees)
-                if (Math.abs(degX) > 5 || Math.abs(degY) > 5 || Math.abs(degZ) > 5) {
-                    offsets[child.name] = {
-                        x: Math.round(degX),
-                        y: Math.round(degY),
-                        z: Math.round(degZ)
-                    };
-                }
-            }
-        });
-
-        console.log(`\n✅ Found ${Object.keys(offsets).length} bones with significant rotation differences:\n`);
-
-        // Show top 10 offsets
-        const sortedOffsets = Object.entries(offsets)
-            .sort((a, b) => {
-                const magA = Math.abs(a[1].x) + Math.abs(a[1].y) + Math.abs(a[1].z);
-                const magB = Math.abs(b[1].x) + Math.abs(b[1].y) + Math.abs(b[1].z);
-                return magB - magA;
-            })
-            .slice(0, 10);
-
-        sortedOffsets.forEach(([bone, rot]) => {
-            console.log(`  ${bone}: { x: ${rot.x}, y: ${rot.y}, z: ${rot.z} }`);
-        });
-
-        if (Object.keys(offsets).length > 10) {
-            console.log(`  ... and ${Object.keys(offsets).length - 10} more bones`);
-        }
-
-        console.log('\n📝 To use these offsets, add them to boneRotationOffsets in equipment-manager.js');
-        console.log('💡 Or I can automatically apply them - want me to?');
-        console.log('\n================================\n');
-
-        // Reset model to original pose
-        model.traverse((child) => {
-            if (child.isBone && originalRotations.has(child.name)) {
-                child.quaternion.copy(originalRotations.get(child.name));
-            }
-        });
-
-        return offsets;
-    }
-
-    /**
-     * HIERARCHICAL rest pose offset calculation
-     * Processes bones from root to leaves, respecting parent-child relationships
-     * This fixes the "torn torso" problem where upper/lower body have different rotations
-     * Call this from console: app.animationController.calculateHierarchicalOffsets()
-     */
-    calculateHierarchicalOffsets() {
-        const model = this.threeSetup.getLoadedModel();
-        const libraryAnimations = this.animationLibrary ? this.animationLibrary.getAnimations() : [];
-
-        if (!model || libraryAnimations.length === 0) {
-            console.log('❌ Need model and library animations loaded');
-            return null;
-        }
-
-        console.log('\n=== 🌳 CALCULATING HIERARCHICAL REST POSE OFFSETS ===\n');
-        console.log('This approach respects bone hierarchy to avoid "torn torso" problems\n');
-
-        // Step 1: Capture YOUR model's rest pose (original rotations)
-        const originalRotations = new Map();
-        let rootBone = null;
-
-        model.traverse((child) => {
-            if (child.isBone) {
-                originalRotations.set(child.uuid, child.quaternion.clone());
-
-                // Find root bone (bone with no bone parent)
-                if (!child.parent || !child.parent.isBone) {
-                    // Prioritize bone named "Root" if it exists
-                    if (child.name === 'Root' || !rootBone) {
-                        rootBone = child;
-                    }
-                }
-            }
-        });
-
-        if (!rootBone) {
-            console.log('❌ Root bone not found!');
-            return null;
-        }
-
-        console.log(`✅ Found root bone: ${rootBone.name}`);
-        console.log(`✅ Captured ${originalRotations.size} bone rotations from YOUR rest pose`);
-
-        // Step 2: Apply Mixamo T-pose (first frame, WITHOUT any offsets)
-        // Temporarily disable offsets to get raw Mixamo pose
-        const savedOffsets = this.axisCorrection ? this.axisCorrection.boneRotationOffsets : null;
-        if (this.axisCorrection) {
-            this.axisCorrection.boneRotationOffsets = null;
-        }
-
-        if (!this.mixer) {
-            this.mixer = new THREE.AnimationMixer(model);
-        }
-
-        const anim = libraryAnimations[0];
-        let clipToPlay = anim.clip;
-        if (this.boneMapping && Object.keys(this.boneMapping).length > 0) {
-            clipToPlay = this.retargetAnimation(anim.clip);
-        }
-
-        const action = this.mixer.clipAction(clipToPlay);
-        action.play();
-        action.paused = true;
-        action.time = 0;
-        this.mixer.update(0);
-
-        console.log('✅ Applied Mixamo T-pose (first frame, without offsets)');
-
-        // Step 3: Calculate offsets hierarchically (root → leaves)
-        const offsets = {};
-
-        const processHierarchically = (bone, depth = 0) => {
-            const indent = '  '.repeat(depth);
-
-            // Get original rest pose rotation
-            const originalQuat = originalRotations.get(bone.uuid);
-            if (!originalQuat) {
-                console.log(`${indent}⚠️ ${bone.name}: no rest pose saved`);
-                return;
-            }
-
-            // Get current Mixamo rotation (influenced by parent offsets we already applied)
-            const mixamoQuat = bone.quaternion.clone();
-
-            // Calculate offset: offset = original * inverse(mixamo)
-            const tempQuat = new THREE.Quaternion();
-            tempQuat.copy(mixamoQuat).invert();
-            const offsetQuat = originalQuat.clone().multiply(tempQuat);
-
-            // Convert to euler for readability
-            const euler = new THREE.Euler().setFromQuaternion(offsetQuat);
-            const degX = euler.x * 180 / Math.PI;
-            const degY = euler.y * 180 / Math.PI;
-            const degZ = euler.z * 180 / Math.PI;
-
-            // Calculate magnitude
-            const magnitude = Math.abs(degX) + Math.abs(degY) + Math.abs(degZ);
-
-            // Save if significant (> 5 degrees)
-            if (magnitude > 5) {
-                offsets[bone.name] = {
-                    x: Math.round(degX),
-                    y: Math.round(degY),
-                    z: Math.round(degZ)
-                };
-                console.log(`${indent}📍 ${bone.name}: { x: ${Math.round(degX)}, y: ${Math.round(degY)}, z: ${Math.round(degZ)} } (magnitude: ${Math.round(magnitude)}°)`);
-
-                // Apply the offset to this bone NOW (so children see corrected parent)
-                bone.quaternion.copy(originalQuat);
-            } else {
-                console.log(`${indent}✅ ${bone.name}: offset < 5° (OK)`);
-            }
-
-            // Process all bone children recursively
-            bone.children.forEach(child => {
-                if (child.isBone) {
-                    processHierarchically(child, depth + 1);
-                }
-            });
-        };
-
-        console.log('\n🌳 Processing bone hierarchy from root:\n');
-        processHierarchically(rootBone);
-
-        // Restore original offsets setting
-        if (this.axisCorrection) {
-            this.axisCorrection.boneRotationOffsets = savedOffsets;
-        }
-
-        // Summary
-        console.log(`\n✅ Found ${Object.keys(offsets).length} bones with significant rotation differences`);
-
-        if (Object.keys(offsets).length > 0) {
-            console.log('\n📋 SUMMARY (top offsets by magnitude):\n');
-
-            const sortedOffsets = Object.entries(offsets)
-                .sort((a, b) => {
-                    const magA = Math.abs(a[1].x) + Math.abs(a[1].y) + Math.abs(a[1].z);
-                    const magB = Math.abs(b[1].x) + Math.abs(b[1].y) + Math.abs(b[1].z);
-                    return magB - magA;
-                })
-                .slice(0, 15);
-
-            sortedOffsets.forEach(([bone, rot]) => {
-                const mag = Math.abs(rot.x) + Math.abs(rot.y) + Math.abs(rot.z);
-                console.log(`  ${bone}: { x: ${rot.x}, y: ${rot.y}, z: ${rot.z} } (${Math.round(mag)}°)`);
-            });
-
-            if (Object.keys(offsets).length > 15) {
-                console.log(`  ... and ${Object.keys(offsets).length - 15} more bones`);
-            }
-
-            console.log('\n📝 Copy these offsets to boneRotationOffsets in equipment-manager.js');
-            console.log('💡 This should fix the "torn torso" problem!');
-        } else {
-            console.log('\n✨ All bones already aligned - no offsets needed!');
-        }
-
-        console.log('\n================================\n');
-
-        // Reset model to original pose
-        model.traverse((child) => {
-            if (child.isBone && originalRotations.has(child.uuid)) {
-                child.quaternion.copy(originalRotations.get(child.uuid));
-            }
-        });
-
-        return offsets;
-    }
-
-    /**
-     * Apply first frame of Mixamo animation to see T-pose after retargeting
+     * Apply first frame of Mixamo animation to see T-pose
      * Call this from console: app.animationController.showMixamoTPose()
      */
     showMixamoTPose() {
@@ -1132,11 +553,8 @@ class AnimationController {
             this.mixer = new THREE.AnimationMixer(model);
         }
 
-        // Retarget animation
-        let clipToPlay = anim.clip;
-        if (this.boneMapping && Object.keys(this.boneMapping).length > 0) {
-            clipToPlay = this.retargetAnimation(anim.clip);
-        }
+        // Use animation directly (no retargeting)
+        const clipToPlay = anim.clip;
 
         // Create action and apply ONLY first frame (time = 0)
         const action = this.mixer.clipAction(clipToPlay);
@@ -1150,8 +568,7 @@ class AnimationController {
         this.uiController.setAutoplayEnabled(false);
 
         console.log('✅ Applied first frame of Mixamo animation (T-pose)');
-        console.log('💡 This shows how your model looks after bone mapping');
-        console.log('   If it looks twisted/inverted, there is rest pose mismatch');
+        console.log('💡 This shows the T-pose from the animation');
         console.log('\n================================\n');
     }
 
@@ -1353,7 +770,7 @@ class AnimationController {
     }
 
     /**
-     * Debug function: Show animation tracks (before and after retargeting)
+     * Debug function: Show animation tracks
      * Call this from console: app.animationController.debugAnimationTracks()
      */
     debugAnimationTracks() {
@@ -1372,7 +789,7 @@ class AnimationController {
         console.log('\n=== 🎬 ANIMATION TRACKS DEBUG ===');
         console.log('Animation:', walkAnim.name);
         console.log('Duration:', walkAnim.duration, 'seconds');
-        console.log('\n📋 ORIGINAL TRACKS (Mixamo):');
+        console.log('\n📋 ANIMATION TRACKS:');
 
         walkAnim.clip.tracks.slice(0, 10).forEach((track, i) => {
             const type = track.constructor.name;
@@ -1382,39 +799,25 @@ class AnimationController {
 
         console.log(`  ... and ${walkAnim.clip.tracks.length - 10} more tracks`);
 
-        // Show retargeted version
-        if (this.boneMapping && Object.keys(this.boneMapping).length > 0) {
-            console.log('\n📋 RETARGETED TRACKS (Custom Rig):');
-            const retargeted = this.retargetAnimation(walkAnim.clip);
+        // Find Hip/Pelvis tracks specifically
+        console.log('\n🔍 HIP/PELVIS ROTATION TRACKS:');
+        const hipTracks = walkAnim.clip.tracks.filter(t =>
+            (t.name.includes('Hip') || t.name.includes('Pelvis')) &&
+            (t.name.includes('quaternion') || t.name.includes('rotation'))
+        );
 
-            retargeted.tracks.slice(0, 10).forEach((track, i) => {
+        if (hipTracks.length > 0) {
+            hipTracks.forEach(track => {
                 const type = track.constructor.name;
-                const valueCount = track.values.length;
-                console.log(`  ${i + 1}. ${track.name} (${type}, ${valueCount} values)`);
+                console.log(`  ✅ ${track.name} (${type})`);
+                console.log(`     Values: [${track.values.slice(0, 8).map(v => v.toFixed(3)).join(', ')}...]`);
             });
-
-            console.log(`  ... and ${retargeted.tracks.length - 10} more tracks`);
-
-            // Find Hip/Pelvis tracks specifically
-            console.log('\n🔍 HIP/PELVIS ROTATION TRACKS:');
-            const hipTracks = retargeted.tracks.filter(t =>
-                (t.name.includes('Hip') || t.name.includes('Pelvis')) &&
-                (t.name.includes('quaternion') || t.name.includes('rotation'))
-            );
-
-            if (hipTracks.length > 0) {
-                hipTracks.forEach(track => {
-                    const type = track.constructor.name;
-                    console.log(`  ✅ ${track.name} (${type})`);
-                    console.log(`     Values: [${track.values.slice(0, 8).map(v => v.toFixed(3)).join(', ')}...]`);
-                });
-            } else {
-                console.log('  ❌ No Hip/Pelvis rotation tracks found!');
-                console.log('  💡 Available track names containing "Hip" or "Pelvis":');
-                retargeted.tracks
-                    .filter(t => t.name.toLowerCase().includes('hip') || t.name.toLowerCase().includes('pelvis'))
-                    .forEach(t => console.log(`     - ${t.name}`));
-            }
+        } else {
+            console.log('  ❌ No Hip/Pelvis rotation tracks found!');
+            console.log('  💡 Available track names containing "Hip" or "Pelvis":');
+            walkAnim.clip.tracks
+                .filter(t => t.name.toLowerCase().includes('hip') || t.name.toLowerCase().includes('pelvis'))
+                .forEach(t => console.log(`     - ${t.name}`));
         }
 
         console.log('\n=========================\n');
