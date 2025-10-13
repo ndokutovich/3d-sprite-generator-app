@@ -11,6 +11,12 @@ class ThreeSetup {
         this.cameraLight = null; // Camera-attached light for better model visibility
         this.autoRotate = false; // Disable auto-rotation by default when controls are active
 
+        // Orientation gizmo (like Blender's ViewCube)
+        this.gizmoScene = null;
+        this.gizmoCamera = null;
+        this.gizmoRenderer = null;
+        this.gizmoAxes = null;
+
         // Setup loading manager
         this.loadingManager = new THREE.LoadingManager();
         this.setupLoadingManager();
@@ -113,6 +119,13 @@ class ThreeSetup {
         );
         this.scene.add(this.gridHelper);
 
+        // Add LARGE color-coded axes helper for orientation
+        // Red = X+, Green = Y+, Blue = Z+
+        this.axesHelper = new THREE.AxesHelper(3); // 3 units long
+        this.axesHelper.position.set(0, 0, 0); // Center of scene
+        this.scene.add(this.axesHelper);
+        console.log('🎨 Added color-coded axes: RED=X, GREEN=Y, BLUE=Z');
+
         // Setup OrbitControls for mouse interaction
         this.controls = new THREE.OrbitControls(this.camera, canvas);
         this.controls.enableDamping = true;
@@ -124,6 +137,9 @@ class ThreeSetup {
         this.controls.target.set(0, 0, 0);
         this.controls.update();
 
+        // Setup orientation gizmo (ViewCube)
+        this.setupOrientationGizmo();
+
         // Handle window resize
         window.addEventListener('resize', () => this.onWindowResize());
 
@@ -133,6 +149,85 @@ class ThreeSetup {
             renderer: this.renderer,
             controls: this.controls
         };
+    }
+
+    setupOrientationGizmo() {
+        // Create separate scene for gizmo
+        this.gizmoScene = new THREE.Scene();
+
+        // Create orthographic camera for gizmo (no perspective distortion)
+        this.gizmoCamera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10);
+        this.gizmoCamera.position.set(0, 0, 5);
+
+        // Create large axes with thick lines
+        this.gizmoAxes = new THREE.AxesHelper(1.5);
+        this.gizmoScene.add(this.gizmoAxes);
+
+        // Add text labels for axes (X, Y, Z)
+        const createAxisLabel = (text, color, position) => {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 128;
+            canvas.height = 128;
+            context.fillStyle = color;
+            context.font = 'Bold 80px Arial';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, 64, 64);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.position.copy(position);
+            sprite.scale.set(0.5, 0.5, 1);
+            return sprite;
+        };
+
+        this.gizmoScene.add(createAxisLabel('X', '#ff0000', new THREE.Vector3(2, 0, 0)));
+        this.gizmoScene.add(createAxisLabel('Y', '#00ff00', new THREE.Vector3(0, 2, 0)));
+        this.gizmoScene.add(createAxisLabel('Z', '#0000ff', new THREE.Vector3(0, 0, 2)));
+
+        // Add ambient light so gizmo is always visible
+        const gizmoLight = new THREE.AmbientLight(0xffffff, 2);
+        this.gizmoScene.add(gizmoLight);
+
+        console.log('🧭 Orientation gizmo created (bottom-right corner)');
+    }
+
+    renderGizmo() {
+        if (!this.gizmoScene || !this.gizmoCamera) return;
+
+        const canvas = this.renderer.domElement;
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // Gizmo size and position (bottom-right corner)
+        const gizmoSize = 120;
+        const margin = 20;
+
+        // Sync gizmo camera rotation with main camera
+        this.gizmoCamera.quaternion.copy(this.camera.quaternion);
+
+        // Save current viewport
+        const currentViewport = new THREE.Vector4();
+        this.renderer.getViewport(currentViewport);
+
+        // Set viewport for gizmo (bottom-right corner)
+        this.renderer.setViewport(
+            width - gizmoSize - margin,
+            margin,
+            gizmoSize,
+            gizmoSize
+        );
+
+        // Clear depth buffer so gizmo renders on top
+        this.renderer.clearDepth();
+
+        // Render gizmo
+        this.renderer.render(this.gizmoScene, this.gizmoCamera);
+
+        // Restore original viewport
+        this.renderer.setViewport(currentViewport);
     }
 
     setupLighting() {
@@ -215,6 +310,8 @@ class ThreeSetup {
 
     render() {
         this.renderer.render(this.scene, this.camera);
+        // Gizmo disabled temporarily - caused rendering issues
+        // this.renderGizmo();
     }
 
     getDelta() {
@@ -271,6 +368,18 @@ class ThreeSetup {
 
         // Calculate pitch angle (angle from horizontal plane)
         return Math.atan2(dy, horizontalDistance);
+    }
+
+    // Get camera yaw angle (horizontal angle around model)
+    // Returns angle in radians (0 = looking from +Z, clockwise from above)
+    getCurrentCameraAngle() {
+        const target = this.controls ? this.controls.target : new THREE.Vector3(0, 0, 0);
+        const dx = this.camera.position.x - target.x;
+        const dz = this.camera.position.z - target.z;
+
+        // Calculate angle from +Z axis (same convention as sprite directions)
+        // atan2 gives angle from +X axis, so we adjust
+        return Math.atan2(dx, dz);
     }
 
     captureFrame() {

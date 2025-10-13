@@ -98,6 +98,147 @@
                         <option value="8">8 Directions</option>
                         <option value="16">16 Directions</option>
                     </select>
+
+                    <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="singleDirection" style="width: auto;">
+                        <label for="singleDirection" style="margin: 0; cursor: pointer;">
+                            👁️ Single Direction Only (Current View)
+                        </label>
+                    </div>
+                    <div class="info-box" style="margin-top: 5px; display: none;" id="singleDirectionInfo">
+                        Will only generate sprites from the current camera angle. Perfect for side-scrolling games!
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>⚔️ Equipment Inventory</h3>
+
+                    <label for="equipmentSlot">Equipment Slot:</label>
+                    <select id="equipmentSlot">
+                        <option value="weapon">⚔️ Weapon (Right Hand)</option>
+                        <option value="shield">🛡️ Shield/Offhand (Left Hand)</option>
+                        <option value="helmet">🪖 Helmet (Head)</option>
+                        <option value="chest">🦺 Chest Armor (Torso)</option>
+                        <option value="legs">👖 Leg Armor (Hips)</option>
+                        <option value="boots">👢 Boots (Feet)</option>
+                        <option value="back">🎒 Back/Cape (Shoulders)</option>
+                    </select>
+
+                    <div class="file-input-wrapper" style="margin-top: 10px;">
+                        <input type="file" id="equipmentFile" accept=".glb,.gltf,.fbx,.obj">
+                        <label for="equipmentFile" class="file-input-label">Load to Slot</label>
+                    </div>
+                    <div class="info-box">
+                        Supports: GLB, GLTF, FBX, OBJ
+                    </div>
+
+                    <!-- Inventory List -->
+                    <div style="margin-top: 15px;">
+                        <h4 style="margin-bottom: 10px;">📦 Inventory:</h4>
+                        <div id="inventoryList" class="inventory-list">
+                            <div class="empty-inventory">No equipment loaded</div>
+                        </div>
+                    </div>
+
+                    <!-- Equipment Actions -->
+                    <div style="margin-top: 10px; display: flex; gap: 10px;">
+                        <button id="equipAllBtn" disabled style="flex: 1;">Equip All</button>
+                        <button id="unequipAllBtn" disabled style="flex: 1;">Unequip All</button>
+                    </div>
+
+                    <!-- Bone Viewer -->
+                    <div style="margin-top: 10px;">
+                        <button id="viewBonesBtn" disabled style="background: #28a745;">🦴 View Skeleton Bones</button>
+                    </div>
+
+                    <!-- Equipment Adjustment -->
+                    <div style="margin-top: 10px;">
+                        <details>
+                            <summary style="cursor: pointer; user-select: none;">⚙️ Adjust Selected Equipment</summary>
+                            <div style="margin-top: 10px;">
+                                <select id="adjustEquipmentSlot" disabled style="margin-bottom: 10px;">
+                                    <option value="">Select equipped item...</option>
+                                </select>
+
+                                <label><strong>Scale:</strong> <span id="equipScaleValue">1.00</span>x</label>
+                                <input type="range" id="equipScale" min="0.1" max="10" step="0.1" value="1" disabled>
+
+                                <hr style="margin: 10px 0; border: 1px solid #444;">
+
+                                <label>Position X: <span id="equipXValue">0.00</span></label>
+                                <input type="range" id="equipX" min="-0.5" max="0.5" step="0.01" value="0" disabled>
+
+                                <label style="margin-top: 5px;">Position Y: <span id="equipYValue">0.00</span></label>
+                                <input type="range" id="equipY" min="-0.5" max="0.5" step="0.01" value="0" disabled>
+
+                                <label style="margin-top: 5px;">Position Z: <span id="equipZValue">0.00</span></label>
+                                <input type="range" id="equipZ" min="-0.5" max="0.5" step="0.01" value="0" disabled>
+
+                                <hr style="margin: 10px 0; border: 1px solid #444;">
+
+                                <label>Rotation X: <span id="equipRotXValue">0</span>°</label>
+                                <input type="range" id="equipRotX" min="-180" max="180" step="5" value="0" disabled>
+
+                                <label style="margin-top: 5px;">Rotation Y: <span id="equipRotYValue">0</span>°</label>
+                                <input type="range" id="equipRotY" min="-180" max="180" step="5" value="0" disabled>
+
+                                <label style="margin-top: 5px;">Rotation Z: <span id="equipRotZValue">0</span>°</label>
+                                <input type="range" id="equipRotZ" min="-180" max="180" step="5" value="0" disabled>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3>🔧 Quick Rotation Test</h3>
+                    <div class="info-box" style="margin-bottom: 10px;">
+                        Test rotation per axis (0, ±90, ±180, ±270). Click value to set, animation updates immediately.
+                    </div>
+
+                    <div style="background: #1a1a2e; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 12px;">
+                        <div style="margin-bottom: 8px;">
+                            <strong style="color: #ff6b6b;">X:</strong>
+                            <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; margin-top: 3px;">
+                                <button class="rotation-test-btn" data-axis="x" data-value="0" style="padding: 4px 2px; font-size: 11px;">0</button>
+                                <button class="rotation-test-btn" data-axis="x" data-value="90" style="padding: 4px 2px; font-size: 11px;">+90</button>
+                                <button class="rotation-test-btn" data-axis="x" data-value="-90" style="padding: 4px 2px; font-size: 11px;">-90</button>
+                                <button class="rotation-test-btn" data-axis="x" data-value="180" style="padding: 4px 2px; font-size: 11px;">±180</button>
+                                <button class="rotation-test-btn" data-axis="x" data-value="270" style="padding: 4px 2px; font-size: 11px;">+270</button>
+                                <button class="rotation-test-btn" data-axis="x" data-value="-270" style="padding: 4px 2px; font-size: 11px;">-270</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 8px;">
+                            <strong style="color: #51cf66;">Y:</strong>
+                            <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; margin-top: 3px;">
+                                <button class="rotation-test-btn" data-axis="y" data-value="0" style="padding: 4px 2px; font-size: 11px;">0</button>
+                                <button class="rotation-test-btn" data-axis="y" data-value="90" style="padding: 4px 2px; font-size: 11px;">+90</button>
+                                <button class="rotation-test-btn" data-axis="y" data-value="-90" style="padding: 4px 2px; font-size: 11px;">-90</button>
+                                <button class="rotation-test-btn" data-axis="y" data-value="180" style="padding: 4px 2px; font-size: 11px;">±180</button>
+                                <button class="rotation-test-btn" data-axis="y" data-value="270" style="padding: 4px 2px; font-size: 11px;">+270</button>
+                                <button class="rotation-test-btn" data-axis="y" data-value="-270" style="padding: 4px 2px; font-size: 11px;">-270</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <strong style="color: #4dabf7;">Z:</strong>
+                            <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; margin-top: 3px;">
+                                <button class="rotation-test-btn" data-axis="z" data-value="0" style="padding: 4px 2px; font-size: 11px;">0</button>
+                                <button class="rotation-test-btn" data-axis="z" data-value="90" style="padding: 4px 2px; font-size: 11px;">+90</button>
+                                <button class="rotation-test-btn" data-axis="z" data-value="-90" style="padding: 4px 2px; font-size: 11px;">-90</button>
+                                <button class="rotation-test-btn" data-axis="z" data-value="180" style="padding: 4px 2px; font-size: 11px;">±180</button>
+                                <button class="rotation-test-btn" data-axis="z" data-value="270" style="padding: 4px 2px; font-size: 11px;">+270</button>
+                                <button class="rotation-test-btn" data-axis="z" data-value="-270" style="padding: 4px 2px; font-size: 11px;">-270</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: #2a2a3e; padding: 15px; border-radius: 5px; font-size: 16px; font-family: monospace;">
+                        <strong>Current Rotation:</strong><br>
+                        <span style="color: #ff6b6b;">X: <span id="currentRotX">180</span>°</span> |
+                        <span style="color: #51cf66;">Y: <span id="currentRotY">0</span>°</span> |
+                        <span style="color: #4dabf7;">Z: <span id="currentRotZ">0</span>°</span>
+                    </div>
                 </div>
 
                 <div class="control-group">
@@ -142,6 +283,76 @@
         </div>
     </div>
 
+    <!-- Bone Viewer Modal -->
+    <div class="bone-viewer-modal" id="boneViewerModal" style="display: none;">
+        <div class="bone-viewer-content">
+            <div class="bone-viewer-header">
+                <h2>🦴 Skeleton Bone Viewer</h2>
+                <span class="bone-viewer-close" id="boneViewerClose">&times;</span>
+            </div>
+
+            <div class="bone-viewer-body">
+                <div class="bone-viewer-section">
+                    <h3>📊 Rig Analysis</h3>
+                    <div id="rigStats" class="rig-stats"></div>
+                </div>
+
+                <div class="bone-viewer-tabs">
+                    <button class="bone-tab active" data-tab="hierarchy">Bone Hierarchy</button>
+                    <button class="bone-tab" data-tab="mapping">Auto Mapping</button>
+                    <button class="bone-tab" data-tab="manual">✏️ Manual Mapping</button>
+                    <button class="bone-tab" data-tab="comparison">Rig Comparison</button>
+                </div>
+
+                <div class="bone-viewer-tab-content">
+                    <!-- Hierarchy Tab -->
+                    <div id="hierarchyTab" class="tab-pane active">
+                        <div class="bone-tree" id="boneTree"></div>
+                    </div>
+
+                    <!-- Auto Mapping Tab -->
+                    <div id="mappingTab" class="tab-pane">
+                        <div class="mapping-controls">
+                            <button id="autoMapBtn" class="mapping-btn">🔄 Auto-Map to Mixamo</button>
+                            <button id="copyMappingBtn" class="mapping-btn">📋 Copy Mapping Code</button>
+                        </div>
+                        <div id="boneMapping" class="bone-mapping"></div>
+                    </div>
+
+                    <!-- Manual Mapping Tab -->
+                    <div id="manualTab" class="tab-pane">
+                        <div class="mapping-controls">
+                            <button id="fillFromAutoBtn" class="mapping-btn">🤖 Fill from Auto-Map</button>
+                            <button id="saveMappingBtn" class="mapping-btn">💾 Save Mapping</button>
+                            <button id="loadMappingBtn" class="mapping-btn">📂 Load Mapping</button>
+                            <button id="clearMappingBtn" class="mapping-btn" style="background: #dc3545;">🗑️ Clear All</button>
+                        </div>
+                        <div class="info-box" style="margin: 15px 0;">
+                            <strong>Manual Mapping Editor</strong><br>
+                            Map your custom rig bones to Mixamo standard bones for 100% accurate animation retargeting.
+                            Mapping is saved to browser localStorage.
+                        </div>
+                        <div id="manualMappingEditor" class="manual-mapping-editor"></div>
+                    </div>
+
+                    <!-- Comparison Tab -->
+                    <div id="comparisonTab" class="tab-pane">
+                        <div class="comparison-grid">
+                            <div class="comparison-column">
+                                <h4>Current Rig</h4>
+                                <div id="currentRigList" class="bone-list"></div>
+                            </div>
+                            <div class="comparison-column">
+                                <h4>Mixamo Standard</h4>
+                                <div id="mixamoRigList" class="bone-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Third-party libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -164,6 +375,7 @@
     <script src="js/three-setup.js"></script>
     <script src="js/model-loader.js"></script>
     <script src="js/animation-controller.js"></script>
+    <script src="js/equipment-manager.js"></script>
     <script src="js/sprite-generator.js"></script>
     <script src="js/file-handler.js"></script>
     <script src="js/app.js"></script>

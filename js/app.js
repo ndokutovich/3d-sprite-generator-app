@@ -6,7 +6,8 @@ class App {
         this.threeSetup = new ThreeSetup();
         this.animationLibrary = new AnimationLibrary();
         this.modelLoader = new ModelLoader(this.threeSetup, this.uiController);
-        this.animationController = new AnimationController(this.threeSetup, this.uiController, this.animationLibrary);
+        this.equipmentManager = new EquipmentManager(this.threeSetup, this.uiController);
+        this.animationController = new AnimationController(this.threeSetup, this.uiController, this.animationLibrary, this.equipmentManager);
         this.spriteGenerator = new SpriteGenerator(this.threeSetup, this.uiController, this.animationController);
         this.fileHandler = new FileHandler(this.uiController);
 
@@ -90,6 +91,15 @@ class App {
             this.animationController.setLockPosition(enabled);
         });
 
+        this.uiController.onSingleDirectionToggle((e) => {
+            const enabled = e.target.checked;
+            if (enabled) {
+                this.uiController.showSingleDirectionInfo();
+            } else {
+                this.uiController.hideSingleDirectionInfo();
+            }
+        });
+
         // Camera controls
         this.uiController.onCameraDistanceChange((e) => {
             const distance = parseFloat(e.target.value);
@@ -110,6 +120,39 @@ class App {
         // Error close button
         this.uiController.onErrorClose(() => {
             this.uiController.hideError();
+        });
+
+        // Equipment Inventory controls
+        this.uiController.onEquipmentFileSelect((e) => this.handleEquipmentFileSelect(e));
+        this.uiController.onEquipAllClick(() => this.handleEquipAll());
+        this.uiController.onUnequipAllClick(() => this.handleUnequipAll());
+        this.uiController.onAdjustEquipmentSlotChange((e) => this.handleAdjustEquipmentSlotChange(e));
+        this.uiController.onEquipmentAdjustmentChange((e) => this.handleEquipmentAdjustmentChange(e));
+
+        // Bone Viewer controls
+        this.uiController.onViewBonesClick(() => this.handleViewBones());
+        this.uiController.onBoneViewerClose(() => this.uiController.closeBoneViewer());
+        this.uiController.onAutoMapClick(() => this.handleAutoMap());
+        this.uiController.onCopyMappingClick(() => this.handleCopyMapping());
+
+        // Rotation Test controls (per-axis)
+        this.currentRotation = { x: 180, y: 0, z: 0 }; // Track current values
+        const rotationBtns = document.querySelectorAll('.rotation-test-btn');
+        rotationBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const axis = btn.dataset.axis;
+                const value = parseInt(btn.dataset.value);
+
+                // Update only the clicked axis
+                this.currentRotation[axis] = value;
+
+                // Apply combined rotation
+                this.handleRotationTest(
+                    this.currentRotation.x,
+                    this.currentRotation.y,
+                    this.currentRotation.z
+                );
+            });
         });
     }
 
@@ -152,10 +195,11 @@ class App {
                 this.animationController.reset();
             }
 
-            // Enable generate button after successful load
+            // Enable generate button and bone viewer after successful load
             setTimeout(() => {
                 this.uiController.hideLoading();
                 this.uiController.enableGenerateButton();
+                this.uiController.enableViewBonesButton();
             }, 500);
 
         } catch (error) {
@@ -210,6 +254,186 @@ class App {
             await this.fileHandler.createZipArchive(sprites);
         } catch (error) {
             console.error('Error downloading ZIP:', error);
+        }
+    }
+
+    // Equipment Inventory Handlers
+
+    async handleEquipmentFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const slot = this.uiController.getSelectedEquipmentSlot();
+        try {
+            const { contents, extension, fileName } = await this.fileHandler.readFile(file);
+            await this.equipmentManager.loadEquipmentToSlot(slot, contents, extension, fileName);
+
+            // Update inventory display
+            this.updateInventoryDisplay();
+
+            console.log(`✅ ${fileName} loaded to ${slot} slot!`);
+        } catch (error) {
+            console.error('Error loading equipment:', error);
+            this.uiController.showError('Failed to load equipment file');
+        }
+
+        e.target.value = '';
+    }
+
+    handleEquipAll() {
+        const equipped = this.equipmentManager.equipAll();
+        this.updateInventoryDisplay();
+        this.updateAdjustEquipmentDropdown();
+        console.log(`✅ Equipped ${equipped} items`);
+    }
+
+    handleUnequipAll() {
+        this.equipmentManager.unequipAll();
+        this.updateInventoryDisplay();
+        this.updateAdjustEquipmentDropdown();
+        console.log('✅ All equipment unequipped');
+    }
+
+    handleInventoryEquipClick(slot, shouldEquip) {
+        if (shouldEquip) {
+            this.equipmentManager.equipSlot(slot);
+        } else {
+            this.equipmentManager.unequipSlot(slot);
+        }
+        this.updateInventoryDisplay();
+        this.updateAdjustEquipmentDropdown();
+    }
+
+    handleInventoryRemoveClick(slot) {
+        this.equipmentManager.removeFromInventory(slot);
+        this.updateInventoryDisplay();
+        this.updateAdjustEquipmentDropdown();
+    }
+
+    handleAdjustEquipmentSlotChange(e) {
+        const slot = e.target.value;
+        if (slot) {
+            this.uiController.enableEquipmentAdjustments();
+        } else {
+            this.uiController.disableEquipmentAdjustments();
+        }
+    }
+
+    handleEquipmentAdjustmentChange(e) {
+        const adjustments = this.uiController.getEquipmentAdjustments();
+
+        if (!adjustments.slot) return;
+
+        // Update display values
+        this.uiController.updateEquipmentAdjustmentDisplays();
+
+        // Apply adjustments
+        this.equipmentManager.updateOffsets(adjustments.slot, {
+            position: adjustments.position,
+            rotation: adjustments.rotation,
+            scale: adjustments.scale
+        });
+    }
+
+    updateInventoryDisplay() {
+        const inventory = this.equipmentManager.getInventory();
+        this.uiController.updateInventoryDisplay(
+            inventory,
+            (slot, shouldEquip) => this.handleInventoryEquipClick(slot, shouldEquip),
+            (slot) => this.handleInventoryRemoveClick(slot)
+        );
+    }
+
+    updateAdjustEquipmentDropdown() {
+        const equippedSlots = Array.from(this.equipmentManager.equippedItems.keys());
+        this.uiController.updateAdjustEquipmentDropdown(equippedSlots);
+    }
+
+    // Bone Viewer Handlers
+
+    handleViewBones() {
+        const analysis = this.equipmentManager.analyzeSkeleton();
+        if (!analysis) {
+            this.uiController.showError('No skeleton found in loaded model');
+            return;
+        }
+
+        const mappingResult = this.equipmentManager.autoMapToMixamo();
+
+        this.uiController.showBoneViewer(analysis, mappingResult);
+
+        console.log('🦴 Skeleton Analysis:');
+        console.log(`Total Bones: ${analysis.totalBones}`);
+        console.log(`Root Bone: ${analysis.rootBone}`);
+        console.log(`Rig Type: ${analysis.isMixamo ? 'Mixamo' : 'Custom'}`);
+        console.log(`Has Fingers: ${analysis.hasFingers ? 'Yes' : 'No'}`);
+        console.log('Bone Hierarchy:', analysis.hierarchy);
+
+        if (mappingResult) {
+            console.log(`\n🗺️ Mixamo Mapping:`);
+            console.log(`Match Rate: ${mappingResult.matchRate}`);
+            console.log(`Matched: ${mappingResult.totalMatched}/${mappingResult.totalMixamoBones} bones`);
+        }
+    }
+
+    handleAutoMap() {
+        const mappingResult = this.equipmentManager.autoMapToMixamo();
+        if (!mappingResult) {
+            this.uiController.showError('Could not generate mapping');
+            return;
+        }
+
+        this.uiController.updateBoneMapping(mappingResult);
+
+        console.log('🔄 Auto-mapping completed!');
+        console.log(`Match Rate: ${mappingResult.matchRate}`);
+        console.log('Mapping:', mappingResult.mapping);
+    }
+
+    handleCopyMapping() {
+        const code = this.equipmentManager.generateMappingCode();
+
+        // Copy to clipboard
+        navigator.clipboard.writeText(code).then(() => {
+            console.log('📋 Mapping code copied to clipboard!');
+            console.log(code);
+            alert('Bone mapping code copied to clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            // Fallback: show in console
+            console.log('📋 Bone Mapping Code:');
+            console.log(code);
+            alert('Copy failed. Check console for mapping code.');
+        });
+    }
+
+    handleRotationTest(x, y, z) {
+        console.log(`\n🔄 Testing rotation: X:${x}° Y:${y}° Z:${z}°`);
+
+        // Update equipment-manager preset
+        const preset = this.equipmentManager.detectPresetRigType();
+        if (preset && preset.axisCorrection) {
+            preset.axisCorrection.globalRotationOffset = { x, y, z };
+            this.animationController.axisCorrection = preset.axisCorrection;
+
+            // Update UI display (separate for each axis)
+            document.getElementById('currentRotX').textContent = x;
+            document.getElementById('currentRotY').textContent = y;
+            document.getElementById('currentRotZ').textContent = z;
+
+            // Re-select current animation to apply new rotation
+            const animSelect = document.getElementById('animationSelect');
+            const currentAnimIndex = parseInt(animSelect.value);
+            if (currentAnimIndex >= 0) {
+                this.animationController.selectAnimation(-1); // Reset
+                setTimeout(() => {
+                    this.animationController.selectAnimation(currentAnimIndex); // Re-apply
+                }, 100);
+            }
+
+            console.log('✅ Rotation applied! Animation reloaded.');
+        } else {
+            console.log('❌ No preset detected');
         }
     }
 

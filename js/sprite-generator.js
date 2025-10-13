@@ -53,8 +53,21 @@ class SpriteGenerator {
         const horizontalDistance = distance * Math.cos(pitch);
 
         // Get directions
-        const directionCount = this.uiController.getDirectionCount();
-        const directions = directionCount === 16 ? CONFIG.DIRECTIONS_16 : CONFIG.DIRECTIONS_8;
+        let directions;
+        const singleDirectionMode = this.uiController.isSingleDirectionEnabled();
+
+        if (singleDirectionMode) {
+            // Single direction mode - use current camera angle
+            const currentAngle = this.threeSetup.getCurrentCameraAngle();
+            directions = [{
+                name: 'current_view',
+                angle: currentAngle
+            }];
+        } else {
+            // Multi-direction mode - use 8 or 16 directions
+            const directionCount = this.uiController.getDirectionCount();
+            directions = directionCount === 16 ? CONFIG.DIRECTIONS_16 : CONFIG.DIRECTIONS_8;
+        }
 
         // Save state for restoration
         const originalCameraPosition = this.threeSetup.camera.position.clone();
