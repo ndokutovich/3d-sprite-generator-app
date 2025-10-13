@@ -410,31 +410,26 @@ class App {
     handleRotationTest(x, y, z) {
         console.log(`\n🔄 Testing rotation: X:${x}° Y:${y}° Z:${z}°`);
 
-        // Update equipment-manager preset
-        const preset = this.equipmentManager.detectPresetRigType();
-        if (preset && preset.axisCorrection) {
-            preset.axisCorrection.globalRotationOffset = { x, y, z };
-            this.animationController.axisCorrection = preset.axisCorrection;
-
-            // Update UI display (separate for each axis)
-            document.getElementById('currentRotX').textContent = x;
-            document.getElementById('currentRotY').textContent = y;
-            document.getElementById('currentRotZ').textContent = z;
-
-            // Re-select current animation to apply new rotation
-            const animSelect = document.getElementById('animationSelect');
-            const currentAnimIndex = parseInt(animSelect.value);
-            if (currentAnimIndex >= 0) {
-                this.animationController.selectAnimation(-1); // Reset
-                setTimeout(() => {
-                    this.animationController.selectAnimation(currentAnimIndex); // Re-apply
-                }, 100);
-            }
-
-            console.log('✅ Rotation applied! Animation reloaded.');
-        } else {
-            console.log('❌ No preset detected');
+        const model = this.threeSetup.getLoadedModel();
+        if (!model) {
+            console.log('❌ No model loaded');
+            return;
         }
+
+        // Apply rotation directly to model
+        model.rotation.set(
+            x * Math.PI / 180,
+            y * Math.PI / 180,
+            z * Math.PI / 180
+        );
+
+        // Update UI display
+        document.getElementById('currentRotX').textContent = x;
+        document.getElementById('currentRotY').textContent = y;
+        document.getElementById('currentRotZ').textContent = z;
+
+        console.log('✅ Rotation applied to model!');
+        console.log('💡 This is a visual test only - does not affect animation retargeting');
     }
 
     animate() {
