@@ -106,7 +106,7 @@ class ThreeSetup {
         this.renderer.setSize(width, height, true);
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.shadowMap.enabled = true;
-        this.renderer.setViewport(0, 0, width, height);
+        // Note: setSize() automatically sets viewport to full canvas, no need to call setViewport()
         this.renderer.setClearColor(CONFIG.SCENE.BACKGROUND_COLOR, 1); // Opaque by default
 
         // Setup lighting
@@ -187,47 +187,128 @@ class ThreeSetup {
         this.gizmoScene.add(createAxisLabel('Y', '#00ff00', new THREE.Vector3(0, 2, 0)));
         this.gizmoScene.add(createAxisLabel('Z', '#0000ff', new THREE.Vector3(0, 0, 2)));
 
+        // Create canvas for angle text overlay (will be updated each frame)
+        this.gizmoAngleCanvas = document.createElement('canvas');
+        this.gizmoAngleCanvas.width = 256;
+        this.gizmoAngleCanvas.height = 128;
+        this.gizmoAngleTexture = new THREE.CanvasTexture(this.gizmoAngleCanvas);
+
+        const angleSpriteMaterial = new THREE.SpriteMaterial({
+            map: this.gizmoAngleTexture,
+            depthTest: false,
+            transparent: true
+        });
+        this.gizmoAngleSprite = new THREE.Sprite(angleSpriteMaterial);
+        this.gizmoAngleSprite.position.set(0, -1.8, 0);
+        this.gizmoAngleSprite.scale.set(2, 1, 1);
+        this.gizmoScene.add(this.gizmoAngleSprite);
+
         // Add ambient light so gizmo is always visible
         const gizmoLight = new THREE.AmbientLight(0xffffff, 2);
         this.gizmoScene.add(gizmoLight);
 
-        console.log('🧭 Orientation gizmo created (bottom-right corner)');
+        console.log('🧭 Orientation gizmo created (top-right corner, always visible)');
+    }
+
+    updateGizmoAngleText() {
+        if (!this.gizmoAngleCanvas) return;
+
+        const ctx = this.gizmoAngleCanvas.getContext('2d');
+
+        // Clear canvas
+        ctx.clearRect(0, 0, this.gizmoAngleCanvas.width, this.gizmoAngleCanvas.height);
+
+        // Calculate camera angles in degrees
+        const euler = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ');
+        const yaw = THREE.MathUtils.radToDeg(euler.y);     // Horizontal rotation (azimuth)
+        const pitch = THREE.MathUtils.radToDeg(euler.x);   // Vertical rotation (elevation)
+        const roll = THREE.MathUtils.radToDeg(euler.z);    // Roll rotation
+
+        // Draw semi-transparent background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(0, 0, this.gizmoAngleCanvas.width, this.gizmoAngleCanvas.height);
+
+        // Draw text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'Bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const centerX = this.gizmoAngleCanvas.width / 2;
+        ctx.fillText(`Yaw: ${yaw.toFixed(1)}°`, centerX, 30);
+        ctx.fillText(`Pitch: ${pitch.toFixed(1)}°`, centerX, 60);
+        ctx.fillText(`Roll: ${roll.toFixed(1)}°`, centerX, 90);
+
+        // Update texture
+        this.gizmoAngleTexture.needsUpdate = true;
     }
 
     renderGizmo() {
-        if (!this.gizmoScene || !this.gizmoCamera) return;
+        if (!this.gizmoScene || !this.gizmoCamera) {
+            return;
+        }
 
         const canvas = this.renderer.domElement;
         const width = canvas.width;
         const height = canvas.height;
 
-        // Gizmo size and position (bottom-right corner)
+        // Gizmo size and position (top-right corner, like Blender)
         const gizmoSize = 120;
         const margin = 20;
 
-        // Sync gizmo camera rotation with main camera
-        this.gizmoCamera.quaternion.copy(this.camera.quaternion);
+        // Position gizmo camera to match main camera's viewing direction
+        // but at a fixed distance from origin (so it doesn't move with pan/zoom)
+        const gizmoDistance = 5;
 
-        // Save current viewport
+        // Get the direction from main camera to its target
+        const direction = new THREE.Vector3();
+        this.camera.getWorldDirection(direction);
+
+        // Position gizmo camera in opposite direction (looking back at origin)
+        this.gizmoCamera.position.copy(direction).multiplyScalar(-gizmoDistance);
+
+        // Make gizmo camera look at the axes origin
+        this.gizmoCamera.lookAt(0, 0, 0);
+
+        // Update angle text display
+        this.updateGizmoAngleText();
+
+        // Save current viewport and scissor state
         const currentViewport = new THREE.Vector4();
+        const currentScissor = new THREE.Vector4();
         this.renderer.getViewport(currentViewport);
+        this.renderer.getScissor(currentScissor);
+        const scissorTestEnabled = this.renderer.getScissorTest();
 
-        // Set viewport for gizmo (bottom-right corner)
-        this.renderer.setViewport(
-            width - gizmoSize - margin,
-            margin,
-            gizmoSize,
-            gizmoSize
-        );
+        // Calculate gizmo position (top-right corner)
+        const gizmoX = width - gizmoSize - margin;
+        const gizmoY = height - gizmoSize - margin;
+
+        // Enable scissor test to isolate gizmo rendering
+        this.renderer.setScissorTest(true);
+        this.renderer.setScissor(gizmoX, gizmoY, gizmoSize, gizmoSize);
+        this.renderer.setViewport(gizmoX, gizmoY, gizmoSize, gizmoSize);
 
         // Clear depth buffer so gizmo renders on top
         this.renderer.clearDepth();
 
-        // Render gizmo
+        // Render gizmo scene
         this.renderer.render(this.gizmoScene, this.gizmoCamera);
 
-        // Restore original viewport
-        this.renderer.setViewport(currentViewport);
+        // Restore original viewport, scissor, and scissor test state
+        this.renderer.setViewport(
+            currentViewport.x,
+            currentViewport.y,
+            currentViewport.z,
+            currentViewport.w
+        );
+        this.renderer.setScissor(
+            currentScissor.x,
+            currentScissor.y,
+            currentScissor.z,
+            currentScissor.w
+        );
+        this.renderer.setScissorTest(scissorTestEnabled);
     }
 
     setupLighting() {
@@ -266,7 +347,7 @@ class ThreeSetup {
             this.camera.aspect = width / height;
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(width, height, true);
-            this.renderer.setViewport(0, 0, width, height);
+            // Note: setSize() automatically sets viewport to full canvas
         }
     }
 
@@ -284,6 +365,14 @@ class ThreeSetup {
 
     getLoadedModel() {
         return this.loadedModel;
+    }
+
+    getCamera() {
+        return this.camera;
+    }
+
+    getOrbitControls() {
+        return this.controls;
     }
 
     centerAndScaleModel() {
@@ -309,9 +398,11 @@ class ThreeSetup {
     }
 
     render() {
+        // Render main scene
         this.renderer.render(this.scene, this.camera);
-        // Gizmo disabled temporarily - caused rendering issues
-        // this.renderGizmo();
+
+        // Render orientation gizmo (always visible in top-right)
+        this.renderGizmo();
     }
 
     getDelta() {
@@ -431,5 +522,68 @@ class ThreeSetup {
 
     enableAutoRotation() {
         this.autoRotate = true;
+    }
+
+    // Camera control methods
+    setCameraTarget(x, y, z) {
+        if (this.controls) {
+            this.controls.target.set(x, y, z);
+            this.controls.update();
+        }
+    }
+
+    setCameraPositionDirect(x, y, z) {
+        this.camera.position.set(x, y, z);
+        if (this.controls) {
+            this.controls.update();
+        }
+    }
+
+    setCameraFOV(fov) {
+        this.camera.fov = fov;
+        this.camera.updateProjectionMatrix();
+    }
+
+    setCameraNear(near) {
+        this.camera.near = near;
+        this.camera.updateProjectionMatrix();
+    }
+
+    setCameraFar(far) {
+        this.camera.far = far;
+        this.camera.updateProjectionMatrix();
+    }
+
+    getCameraTarget() {
+        return this.controls ? this.controls.target.clone() : new THREE.Vector3(0, 0, 0);
+    }
+
+    resetCameraToDefault() {
+        // Reset position
+        this.camera.position.set(
+            CONFIG.CAMERA.DEFAULT_DISTANCE,
+            CONFIG.CAMERA.DEFAULT_HEIGHT,
+            CONFIG.CAMERA.DEFAULT_DISTANCE
+        );
+
+        // Reset target
+        if (this.controls) {
+            this.controls.target.set(0, 0, 0);
+            this.controls.update();
+        }
+
+        // Reset camera properties
+        this.camera.fov = CONFIG.CAMERA.FOV;
+        this.camera.near = CONFIG.CAMERA.NEAR;
+        this.camera.far = CONFIG.CAMERA.FAR;
+        this.camera.updateProjectionMatrix();
+
+        return {
+            position: this.camera.position.clone(),
+            target: this.controls.target.clone(),
+            fov: this.camera.fov,
+            near: this.camera.near,
+            far: this.camera.far
+        };
     }
 }

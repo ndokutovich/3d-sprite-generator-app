@@ -8,6 +8,8 @@ class App {
         this.modelLoader = new ModelLoader(this.threeSetup, this.uiController);
         this.equipmentManager = new EquipmentManager(this.threeSetup, this.uiController);
         this.animationController = new AnimationController(this.threeSetup, this.uiController, this.animationLibrary, this.equipmentManager);
+        this.gizmoController = new GizmoController(this.threeSetup, this.equipmentManager, this.uiController);
+        this.undoManager = new UndoManager();
         this.spriteGenerator = new SpriteGenerator(this.threeSetup, this.uiController, this.animationController);
         this.fileHandler = new FileHandler(this.uiController);
 
@@ -117,6 +119,9 @@ class App {
             this.threeSetup.setCameraLightIntensity(intensity);
         });
 
+        // Advanced camera controls
+        this.setupAdvancedCameraControls();
+
         // Error close button
         this.uiController.onErrorClose(() => {
             this.uiController.hideError();
@@ -134,6 +139,15 @@ class App {
         this.uiController.onBoneViewerClose(() => this.uiController.closeBoneViewer());
         this.uiController.onAutoMapClick(() => this.handleAutoMap());
         this.uiController.onCopyMappingClick(() => this.handleCopyMapping());
+
+        // Gizmo controls
+        this.uiController.onGizmoEnableToggle((e) => this.handleGizmoEnableToggle(e));
+        this.uiController.onGizmoTargetChange(() => this.handleGizmoTargetChange());
+        this.uiController.onGizmoEquipmentSlotChange(() => this.handleGizmoEquipmentSlotChange());
+        this.uiController.onGizmoModeChange((mode) => this.handleGizmoModeChange(mode));
+
+        // Undo/Redo controls
+        this.setupUndoRedoControls();
 
         // Rotation Test controls (per-axis)
         this.currentRotation = { x: 180, y: 0, z: 0 }; // Track current values
@@ -172,6 +186,79 @@ class App {
                 event.preventDefault();
             }
         }, true);
+    }
+
+    setupUndoRedoControls() {
+        // Undo/Redo button handlers
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => {
+                if (this.undoManager.undo()) {
+                    this.updateUndoRedoButtons();
+                    // Refresh UI to reflect changes
+                    this.updateInventoryDisplay();
+                    this.updateAdjustEquipmentDropdown();
+                }
+            });
+        }
+
+        if (redoBtn) {
+            redoBtn.addEventListener('click', () => {
+                if (this.undoManager.redo()) {
+                    this.updateUndoRedoButtons();
+                    // Refresh UI to reflect changes
+                    this.updateInventoryDisplay();
+                    this.updateAdjustEquipmentDropdown();
+                }
+            });
+        }
+
+        // Keyboard shortcuts
+        window.addEventListener('keydown', (e) => {
+            // Ctrl+Z or Cmd+Z for undo
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                if (this.undoManager.undo()) {
+                    this.updateUndoRedoButtons();
+                    this.updateInventoryDisplay();
+                    this.updateAdjustEquipmentDropdown();
+                }
+            }
+            // Ctrl+Shift+Z or Cmd+Shift+Z for redo
+            else if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+                e.preventDefault();
+                if (this.undoManager.redo()) {
+                    this.updateUndoRedoButtons();
+                    this.updateInventoryDisplay();
+                    this.updateAdjustEquipmentDropdown();
+                }
+            }
+            // Alternative: Ctrl+Y for redo
+            else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+                e.preventDefault();
+                if (this.undoManager.redo()) {
+                    this.updateUndoRedoButtons();
+                    this.updateInventoryDisplay();
+                    this.updateAdjustEquipmentDropdown();
+                }
+            }
+        });
+
+        console.log('⌨️ Undo/Redo shortcuts: Ctrl+Z (undo), Ctrl+Shift+Z or Ctrl+Y (redo)');
+    }
+
+    updateUndoRedoButtons() {
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+
+        if (undoBtn) {
+            undoBtn.disabled = !this.undoManager.canUndo();
+        }
+        if (redoBtn) {
+            redoBtn.disabled = !this.undoManager.canRedo();
+        }
     }
 
     async handleFileSelect(e) {
@@ -285,6 +372,12 @@ class App {
         this.updateInventoryDisplay();
         this.updateAdjustEquipmentDropdown();
         console.log(`✅ Equipped ${equipped} items`);
+
+        // Auto-enable gizmo for first equipped item
+        const firstEquipped = Array.from(this.equipmentManager.equippedItems.keys())[0];
+        if (firstEquipped) {
+            this.autoEnableEquipmentGizmo(firstEquipped);
+        }
     }
 
     handleUnequipAll() {
@@ -295,13 +388,44 @@ class App {
     }
 
     handleInventoryEquipClick(slot, shouldEquip) {
+        // Create and execute command for undo/redo
+        const command = new EquipCommand(this.equipmentManager, slot, shouldEquip);
+        this.undoManager.execute(command);
+        this.updateUndoRedoButtons();
+
         if (shouldEquip) {
-            this.equipmentManager.equipSlot(slot);
-        } else {
-            this.equipmentManager.unequipSlot(slot);
+            // Auto-enable gizmo for newly equipped item
+            this.autoEnableEquipmentGizmo(slot);
         }
+
         this.updateInventoryDisplay();
         this.updateAdjustEquipmentDropdown();
+    }
+
+    autoEnableEquipmentGizmo(slot) {
+        // Enable gizmo checkbox
+        const gizmoCheckbox = document.getElementById('enableGizmo');
+        if (gizmoCheckbox && !gizmoCheckbox.checked) {
+            gizmoCheckbox.checked = true;
+            // Trigger the enable toggle
+            this.handleGizmoEnableToggle({ target: gizmoCheckbox });
+        }
+
+        // Select equipment target
+        const targetSelect = document.getElementById('gizmoTarget');
+        if (targetSelect) {
+            targetSelect.value = 'equipment';
+            this.handleGizmoTargetChange();
+        }
+
+        // Select the specific equipment slot
+        const slotSelect = document.getElementById('gizmoEquipmentSlot');
+        if (slotSelect) {
+            slotSelect.value = slot;
+            this.handleGizmoEquipmentSlotChange();
+        }
+
+        console.log(`🎯 Auto-enabled gizmo for ${slot}`);
     }
 
     handleInventoryRemoveClick(slot) {
@@ -314,8 +438,19 @@ class App {
         const slot = e.target.value;
         if (slot) {
             this.uiController.enableEquipmentAdjustments();
+
+            // Store current offsets as baseline for undo
+            const item = this.equipmentManager.equippedItems.get(slot);
+            if (item && item.offsets) {
+                this.lastEquipmentOffsets = {
+                    position: { ...item.offsets.position },
+                    rotation: { ...item.offsets.rotation },
+                    scale: item.offsets.scale
+                };
+            }
         } else {
             this.uiController.disableEquipmentAdjustments();
+            this.lastEquipmentOffsets = null;
         }
     }
 
@@ -324,15 +459,54 @@ class App {
 
         if (!adjustments.slot) return;
 
+        // Get current offsets before change
+        const item = this.equipmentManager.equippedItems.get(adjustments.slot);
+        if (!item || !this.lastEquipmentOffsets) {
+            // Store initial offsets for first change
+            this.lastEquipmentOffsets = {
+                position: adjustments.position,
+                rotation: adjustments.rotation,
+                scale: adjustments.scale
+            };
+        }
+
         // Update display values
         this.uiController.updateEquipmentAdjustmentDisplays();
 
-        // Apply adjustments
+        // Apply adjustments (without command for real-time feedback)
         this.equipmentManager.updateOffsets(adjustments.slot, {
             position: adjustments.position,
             rotation: adjustments.rotation,
             scale: adjustments.scale
         });
+
+        // Debounce command creation to avoid too many undo steps while dragging
+        clearTimeout(this.equipmentAdjustmentTimeout);
+        this.equipmentAdjustmentTimeout = setTimeout(() => {
+            if (this.lastEquipmentOffsets) {
+                const command = new EquipmentTransformCommand(
+                    this.equipmentManager,
+                    adjustments.slot,
+                    this.lastEquipmentOffsets,
+                    {
+                        position: adjustments.position,
+                        rotation: adjustments.rotation,
+                        scale: adjustments.scale
+                    }
+                );
+                // Don't execute (already applied), just add to undo stack
+                this.undoManager.undoStack.push(command);
+                this.undoManager.redoStack = [];
+                this.updateUndoRedoButtons();
+
+                // Update last offsets
+                this.lastEquipmentOffsets = {
+                    position: adjustments.position,
+                    rotation: adjustments.rotation,
+                    scale: adjustments.scale
+                };
+            }
+        }, 500); // 500ms debounce
     }
 
     updateInventoryDisplay() {
@@ -347,6 +521,8 @@ class App {
     updateAdjustEquipmentDropdown() {
         const equippedSlots = Array.from(this.equipmentManager.equippedItems.keys());
         this.uiController.updateAdjustEquipmentDropdown(equippedSlots);
+        // Also update gizmo equipment dropdown
+        this.uiController.updateGizmoEquipmentDropdown(equippedSlots);
     }
 
     // Bone Viewer Handlers
@@ -430,6 +606,56 @@ class App {
 
         console.log('✅ Rotation applied to model!');
         console.log('💡 This is a visual test only - does not affect animation retargeting');
+    }
+
+    // Gizmo Handlers
+
+    handleGizmoEnableToggle(e) {
+        const enabled = e.target.checked;
+
+        if (enabled) {
+            // Initialize gizmo if needed
+            if (!this.gizmoController.gizmo) {
+                this.gizmoController.init();
+            }
+        }
+
+        this.gizmoController.setEnabled(enabled);
+        this.uiController.setGizmoControlsEnabled(enabled);
+
+        console.log(`🎯 Gizmo ${enabled ? 'enabled' : 'disabled'}`);
+    }
+
+    handleGizmoTargetChange() {
+        const target = this.uiController.getGizmoTarget();
+
+        if (target === 'equipment') {
+            // Show equipment selector
+            this.uiController.showGizmoEquipmentSelector();
+            // Update equipment dropdown
+            const equippedSlots = Array.from(this.equipmentManager.equippedItems.keys());
+            this.uiController.updateGizmoEquipmentDropdown(equippedSlots);
+        } else {
+            // Hide equipment selector
+            this.uiController.hideGizmoEquipmentSelector();
+        }
+
+        // Set gizmo target (will attach if gizmo enabled)
+        if (target) {
+            const equipmentSlot = target === 'equipment' ? this.uiController.getGizmoEquipmentSlot() : null;
+            this.gizmoController.setTarget(target, equipmentSlot);
+        } else {
+            this.gizmoController.detach();
+        }
+    }
+
+    handleGizmoEquipmentSlotChange() {
+        const slot = this.uiController.getGizmoEquipmentSlot();
+        this.gizmoController.setTarget('equipment', slot);
+    }
+
+    handleGizmoModeChange(mode) {
+        this.gizmoController.setMode(mode);
     }
 
     animate() {

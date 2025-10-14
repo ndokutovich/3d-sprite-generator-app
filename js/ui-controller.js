@@ -807,4 +807,195 @@ class UIController {
             btn.addEventListener('click', callback);
         }
     }
+
+    // Gizmo Control Methods
+
+    /**
+     * Event handler for gizmo enable toggle
+     */
+    onGizmoEnableToggle(callback) {
+        const checkbox = document.getElementById('enableGizmo');
+        if (checkbox) {
+            checkbox.addEventListener('change', callback);
+        }
+    }
+
+    /**
+     * Event handler for gizmo target selection
+     */
+    onGizmoTargetChange(callback) {
+        const select = document.getElementById('gizmoTarget');
+        if (select) {
+            select.addEventListener('change', callback);
+        }
+    }
+
+    /**
+     * Event handler for gizmo equipment slot selection
+     */
+    onGizmoEquipmentSlotChange(callback) {
+        const select = document.getElementById('gizmoEquipmentSlot');
+        if (select) {
+            select.addEventListener('change', callback);
+        }
+    }
+
+    /**
+     * Event handler for gizmo mode buttons
+     */
+    onGizmoModeChange(callback) {
+        const buttons = [
+            document.getElementById('gizmoModeTranslate'),
+            document.getElementById('gizmoModeRotate'),
+            document.getElementById('gizmoModeScale')
+        ];
+
+        buttons.forEach(btn => {
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    // Update active state
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    // Extract mode from button ID
+                    const mode = btn.id.replace('gizmoMode', '').toLowerCase();
+                    callback(mode);
+                });
+            }
+        });
+    }
+
+    /**
+     * Get gizmo enabled state
+     */
+    isGizmoEnabled() {
+        const checkbox = document.getElementById('enableGizmo');
+        return checkbox ? checkbox.checked : false;
+    }
+
+    /**
+     * Get selected gizmo target
+     */
+    getGizmoTarget() {
+        const select = document.getElementById('gizmoTarget');
+        return select ? select.value : '';
+    }
+
+    /**
+     * Get selected gizmo equipment slot
+     */
+    getGizmoEquipmentSlot() {
+        const select = document.getElementById('gizmoEquipmentSlot');
+        return select ? select.value : '';
+    }
+
+    /**
+     * Update gizmo equipment slot dropdown
+     */
+    updateGizmoEquipmentDropdown(equippedSlots) {
+        const dropdown = document.getElementById('gizmoEquipmentSlot');
+        if (!dropdown) return;
+
+        dropdown.innerHTML = '<option value="">Select equipped item...</option>';
+
+        if (equippedSlots && equippedSlots.length > 0) {
+            equippedSlots.forEach(slot => {
+                const option = document.createElement('option');
+                option.value = slot;
+                option.textContent = this.getSlotDisplayName(slot);
+                dropdown.appendChild(option);
+            });
+            dropdown.disabled = false;
+        } else {
+            dropdown.disabled = true;
+        }
+    }
+
+    /**
+     * Enable/disable gizmo controls
+     */
+    setGizmoControlsEnabled(enabled) {
+        const targetSelect = document.getElementById('gizmoTarget');
+        const equipmentDiv = document.getElementById('equipmentGizmoSelect');
+        const modeButtons = [
+            document.getElementById('gizmoModeTranslate'),
+            document.getElementById('gizmoModeRotate'),
+            document.getElementById('gizmoModeScale')
+        ];
+
+        if (targetSelect) targetSelect.disabled = !enabled;
+        modeButtons.forEach(btn => {
+            if (btn) btn.disabled = !enabled;
+        });
+
+        // Show/hide equipment selector based on target
+        if (equipmentDiv && enabled) {
+            const target = this.getGizmoTarget();
+            equipmentDiv.style.display = target === 'equipment' ? 'block' : 'none';
+        }
+    }
+
+    /**
+     * Show/hide gizmo equipment selector
+     */
+    showGizmoEquipmentSelector() {
+        const div = document.getElementById('equipmentGizmoSelect');
+        if (div) div.style.display = 'block';
+    }
+
+    hideGizmoEquipmentSelector() {
+        const div = document.getElementById('equipmentGizmoSelect');
+        if (div) div.style.display = 'none';
+    }
+
+    /**
+     * Set camera distance value WITHOUT triggering change event
+     * Used by gizmo controller to sync UI during drag
+     */
+    setCameraDistanceValue(distance) {
+        if (this.elements.cameraDistance) {
+            this.elements.cameraDistance.value = distance;
+            this.elements.distanceValue.textContent = distance.toFixed(1);
+        }
+    }
+
+    /**
+     * Set camera height value WITHOUT triggering change event
+     * Used by gizmo controller to sync UI during drag
+     */
+    setCameraHeightValue(height) {
+        if (this.elements.cameraHeight) {
+            this.elements.cameraHeight.value = height;
+            this.elements.heightValue.textContent = height.toFixed(1);
+        }
+    }
+
+    /**
+     * Set equipment adjustment values WITHOUT triggering change events
+     * Used by gizmo controller to sync UI during drag
+     */
+    setEquipmentAdjustmentValues(offsets) {
+        if (offsets.position) {
+            this.elements.equipX.value = offsets.position.x;
+            this.elements.equipXValue.textContent = offsets.position.x.toFixed(2);
+            this.elements.equipY.value = offsets.position.y;
+            this.elements.equipYValue.textContent = offsets.position.y.toFixed(2);
+            this.elements.equipZ.value = offsets.position.z;
+            this.elements.equipZValue.textContent = offsets.position.z.toFixed(2);
+        }
+
+        if (offsets.rotation) {
+            this.elements.equipRotX.value = offsets.rotation.x;
+            this.elements.equipRotXValue.textContent = Math.round(offsets.rotation.x);
+            this.elements.equipRotY.value = offsets.rotation.y;
+            this.elements.equipRotYValue.textContent = Math.round(offsets.rotation.y);
+            this.elements.equipRotZ.value = offsets.rotation.z;
+            this.elements.equipRotZValue.textContent = Math.round(offsets.rotation.z);
+        }
+
+        if (offsets.scale !== undefined) {
+            this.elements.equipScale.value = offsets.scale;
+            this.elements.equipScaleValue.textContent = offsets.scale.toFixed(2);
+        }
+    }
 }
