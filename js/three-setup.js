@@ -294,8 +294,14 @@ class ThreeSetup {
         }
     }
 
-    addModel(model) {
+    addModel(model, fileName = null) {
         this.loadedModel = model;
+
+        // Store file name for preset system
+        if (fileName) {
+            model.userData.fileName = fileName;
+        }
+
         this.scene.add(model);
     }
 

@@ -1,9 +1,10 @@
 // Gizmo Controller - Unified 3D transformation controls
 class GizmoController {
-    constructor(threeSetup, equipmentManager, uiController) {
+    constructor(threeSetup, equipmentManager, uiController, undoManager = null) {
         this.threeSetup = threeSetup;
         this.equipmentManager = equipmentManager;
         this.uiController = uiController;
+        this.undoManager = undoManager;
 
         this.gizmo = null;
         this.enabled = false;
@@ -11,9 +12,12 @@ class GizmoController {
         this.currentMode = 'translate'; // 'translate', 'rotate', 'scale'
         this.currentEquipmentSlot = null;
 
-        // Store original values for syncing
+        // Store original values for syncing and undo
         this.originalCameraDistance = null;
         this.isDragging = false;
+
+        // Store transform state before drag for undo
+        this.transformBeforeDrag = null;
     }
 
     init() {
@@ -53,9 +57,13 @@ class GizmoController {
                 orbitControls.enabled = !event.value;
             }
 
-            if (!event.value) {
-                // Drag ended - sync values back to UI/state
+            if (event.value) {
+                // Drag started - store current transform for undo
+                this.storeTransformBeforeDrag();
+            } else {
+                // Drag ended - sync values back to UI/state and create undo command
                 this.syncAfterDrag();
+                this.createUndoCommand();
             }
         });
 
@@ -65,6 +73,109 @@ class GizmoController {
                 this.syncDuringDrag();
             }
         });
+    }
+
+    storeTransformBeforeDrag() {
+        if (!this.currentTarget || !this.gizmo.object) return;
+
+        const obj = this.gizmo.object;
+
+        // Store current transform state based on target type
+        switch (this.currentTarget) {
+            case 'character':
+            case 'camera':
+                this.transformBeforeDrag = {
+                    position: obj.position.clone(),
+                    rotation: obj.rotation.clone(),
+                    scale: obj.scale.clone()
+                };
+                break;
+
+            case 'equipment':
+                // For equipment, store the offsets (not the raw transform)
+                const item = this.equipmentManager.equippedItems.get(this.currentEquipmentSlot);
+                if (item && item.offsets) {
+                    this.transformBeforeDrag = {
+                        position: { ...item.offsets.position },
+                        rotation: { ...item.offsets.rotation },
+                        scale: item.offsets.scale
+                    };
+                }
+                break;
+        }
+
+        console.log(`💾 Stored transform before drag: ${this.currentTarget}`);
+    }
+
+    createUndoCommand() {
+        if (!this.undoManager || !this.transformBeforeDrag || !this.currentTarget) return;
+
+        const obj = this.gizmo.object;
+        if (!obj) return;
+
+        switch (this.currentTarget) {
+            case 'character':
+                // Create transform command for character
+                const charCommand = new TransformCommand(
+                    obj,
+                    this.currentMode === 'translate' ? 'position' :
+                    this.currentMode === 'rotate' ? 'rotation' : 'scale',
+                    this.transformBeforeDrag[this.currentMode === 'translate' ? 'position' :
+                                           this.currentMode === 'rotate' ? 'rotation' : 'scale'],
+                    obj[this.currentMode === 'translate' ? 'position' :
+                       this.currentMode === 'rotate' ? 'rotation' : 'scale'].clone()
+                );
+                // Add to undo stack without executing (already applied)
+                this.undoManager.undoStack.push(charCommand);
+                this.undoManager.redoStack = [];
+                console.log(`📝 Created undo command: Character ${this.currentMode}`);
+                break;
+
+            case 'camera':
+                // Create camera transform command
+                const camCommand = new TransformCommand(
+                    obj,
+                    this.currentMode === 'translate' ? 'position' :
+                    this.currentMode === 'rotate' ? 'rotation' : 'scale',
+                    this.transformBeforeDrag[this.currentMode === 'translate' ? 'position' :
+                                           this.currentMode === 'rotate' ? 'rotation' : 'scale'],
+                    obj[this.currentMode === 'translate' ? 'position' :
+                       this.currentMode === 'rotate' ? 'rotation' : 'scale'].clone()
+                );
+                this.undoManager.undoStack.push(camCommand);
+                this.undoManager.redoStack = [];
+                console.log(`📝 Created undo command: Camera ${this.currentMode}`);
+                break;
+
+            case 'equipment':
+                // Create equipment transform command
+                const item = this.equipmentManager.equippedItems.get(this.currentEquipmentSlot);
+                if (item && item.offsets) {
+                    const equipCommand = new EquipmentTransformCommand(
+                        this.equipmentManager,
+                        this.currentEquipmentSlot,
+                        this.transformBeforeDrag,
+                        {
+                            position: { ...item.offsets.position },
+                            rotation: { ...item.offsets.rotation },
+                            scale: item.offsets.scale
+                        }
+                    );
+                    // Add to undo stack without executing (already applied)
+                    this.undoManager.undoStack.push(equipCommand);
+                    this.undoManager.redoStack = [];
+                    console.log(`📝 Created undo command: Equipment ${this.currentEquipmentSlot} ${this.currentMode}`);
+                }
+                break;
+        }
+
+        // Clear stored transform
+        this.transformBeforeDrag = null;
+
+        // Notify app to update undo/redo button states
+        if (window.app && window.app.updateUndoRedoButtons) {
+            window.app.updateUndoRedoButtons();
+        }
     }
 
     setEnabled(enabled) {
@@ -280,8 +391,8 @@ class GizmoController {
             scale: equipment.scale.x * boneScale.x
         };
 
-        // Update equipment manager state
-        item.offsets = offsets;
+        // Update equipment manager state (savePreset=true to save changes)
+        this.equipmentManager.updateOffsets(this.currentEquipmentSlot, offsets, true);
 
         // Update UI sliders
         this.uiController.setEquipmentAdjustmentValues(offsets);

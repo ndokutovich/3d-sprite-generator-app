@@ -593,6 +593,40 @@ class UIController {
         this.elements.equipRotZValue.textContent = Math.round(parseFloat(this.elements.equipRotZ.value));
     }
 
+    /**
+     * Show equipment preset indicator
+     * @param {string} slot - Equipment slot
+     * @param {boolean} show - Whether to show the indicator
+     */
+    showPresetIndicator(slot, show = true) {
+        const indicator = document.getElementById('presetIndicator');
+        if (indicator) {
+            indicator.style.display = show ? 'block' : 'none';
+            indicator.dataset.slot = slot;
+        }
+    }
+
+    /**
+     * Hide equipment preset indicator
+     */
+    hidePresetIndicator() {
+        const indicator = document.getElementById('presetIndicator');
+        if (indicator) {
+            indicator.style.display = 'none';
+            delete indicator.dataset.slot;
+        }
+    }
+
+    /**
+     * Event handler for clear preset button
+     */
+    onClearPresetClick(callback) {
+        const btn = document.getElementById('clearPresetBtn');
+        if (btn) {
+            btn.addEventListener('click', callback);
+        }
+    }
+
     // Equipment event listener helpers
 
     onEquipmentFileSelect(callback) {
@@ -1158,6 +1192,162 @@ class UIController {
      */
     onPointToCenterClick(callback) {
         const btn = document.getElementById('pointToCenterBtn');
+        if (btn) {
+            btn.addEventListener('click', callback);
+        }
+    }
+
+    // Equipment Preset Manager Methods
+
+    /**
+     * Show preset manager modal
+     */
+    showPresetManager() {
+        const modal = document.getElementById('presetManagerModal');
+        if (modal) {
+            modal.style.display = 'block';
+        }
+    }
+
+    /**
+     * Close preset manager modal
+     */
+    closePresetManager() {
+        const modal = document.getElementById('presetManagerModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    /**
+     * Update preset list display
+     * @param {Object} presets - All presets from localStorage
+     * @param {Function} onDeleteClick - Callback(key)
+     */
+    updatePresetsList(presets, onDeleteClick) {
+        const listEl = document.getElementById('presetsList');
+        const countEl = document.getElementById('presetCount');
+
+        const presetKeys = Object.keys(presets);
+        const count = presetKeys.length;
+
+        // Update count
+        countEl.textContent = `${count} preset${count !== 1 ? 's' : ''} saved`;
+        countEl.style.color = count > 0 ? '#4caf50' : '#999';
+
+        if (count === 0) {
+            listEl.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px; color: #999;">
+                    <div style="font-size: 48px; margin-bottom: 15px;">📭</div>
+                    <div style="font-size: 16px;">No presets saved yet</div>
+                    <div style="font-size: 13px; margin-top: 8px;">Equipment settings will be saved automatically when you adjust them</div>
+                </div>
+            `;
+            return;
+        }
+
+        // Build preset list HTML
+        listEl.innerHTML = presetKeys.map(key => {
+            const preset = presets[key];
+            const [modelName, equipmentName, boneName] = key.split('|');
+            const date = new Date(preset.timestamp);
+            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+
+            return `
+                <div class="preset-item" data-key="${key}" style="background: #2a2a3e; border-radius: 8px; padding: 15px; margin-bottom: 12px; border: 1px solid #444;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                        <div style="flex: 1;">
+                            <div style="font-size: 14px; font-weight: bold; color: #fff; margin-bottom: 5px;">
+                                ${equipmentName}
+                            </div>
+                            <div style="font-size: 12px; color: #aaa; margin-bottom: 3px;">
+                                <strong>Model:</strong> ${modelName}
+                            </div>
+                            <div style="font-size: 12px; color: #aaa; margin-bottom: 3px;">
+                                <strong>Bone:</strong> ${boneName}
+                            </div>
+                            <div style="font-size: 11px; color: #777; margin-top: 5px;">
+                                Saved: ${dateStr}
+                            </div>
+                        </div>
+                        <button class="preset-delete-btn" data-key="${key}" style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap;">
+                            🗑️ Delete
+                        </button>
+                    </div>
+
+                    <div style="background: #1a1a2e; padding: 10px; border-radius: 5px; font-size: 12px; font-family: monospace;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                            <div>
+                                <div style="color: #888; margin-bottom: 3px;">Position</div>
+                                <div style="color: #4dabf7;">X: ${preset.position.x.toFixed(2)}</div>
+                                <div style="color: #4dabf7;">Y: ${preset.position.y.toFixed(2)}</div>
+                                <div style="color: #4dabf7;">Z: ${preset.position.z.toFixed(2)}</div>
+                            </div>
+                            <div>
+                                <div style="color: #888; margin-bottom: 3px;">Rotation</div>
+                                <div style="color: #ffa500;">X: ${Math.round(preset.rotation.x * 180 / Math.PI)}°</div>
+                                <div style="color: #ffa500;">Y: ${Math.round(preset.rotation.y * 180 / Math.PI)}°</div>
+                                <div style="color: #ffa500;">Z: ${Math.round(preset.rotation.z * 180 / Math.PI)}°</div>
+                            </div>
+                            <div>
+                                <div style="color: #888; margin-bottom: 3px;">Scale</div>
+                                <div style="color: #51cf66; font-size: 18px; font-weight: bold; margin-top: 8px;">
+                                    ${preset.scale.toFixed(2)}x
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Attach delete button listeners
+        listEl.querySelectorAll('.preset-delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.key;
+                if (confirm(`Delete preset for "${key.split('|')[1]}"?`)) {
+                    onDeleteClick(key);
+                }
+            });
+        });
+    }
+
+    /**
+     * Event handlers for preset manager
+     */
+    onOpenPresetManagerClick(callback) {
+        const btn = document.getElementById('openPresetManagerBtn');
+        if (btn) {
+            btn.addEventListener('click', callback);
+        }
+    }
+
+    onPresetManagerClose(callback) {
+        const closeBtn = document.getElementById('presetManagerClose');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', callback);
+        }
+
+        // Close on background click
+        const modal = document.getElementById('presetManagerModal');
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    callback();
+                }
+            });
+        }
+    }
+
+    onRefreshPresetsClick(callback) {
+        const btn = document.getElementById('refreshPresetsBtn');
+        if (btn) {
+            btn.addEventListener('click', callback);
+        }
+    }
+
+    onClearAllPresetsClick(callback) {
+        const btn = document.getElementById('clearAllPresetsBtn');
         if (btn) {
             btn.addEventListener('click', callback);
         }

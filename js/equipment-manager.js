@@ -533,12 +533,39 @@ class EquipmentManager {
         // Clone equipment from inventory (so original stays in inventory)
         const equipment = inventoryItem.equipment.clone();
 
-        // Merge default offsets with custom offsets
-        const offsets = {
-            position: customOffsets.position || slotConfig.defaultOffsets,
-            rotation: customOffsets.rotation || { x: 0, y: 0, z: 0 },
-            scale: customOffsets.scale || 1.0
-        };
+        // Try to load preset for this model + equipment + bone combination
+        const modelName = this.getCurrentModelName();
+        const equipmentName = inventoryItem.fileName;
+        const boneName = slotConfig.bone;
+
+        let offsets = null;
+
+        // Check if preset exists and load it
+        if (modelName && equipmentName && boneName) {
+            const preset = this.loadEquipmentPreset(modelName, equipmentName, boneName);
+            if (preset) {
+                console.log(`✨ Auto-applying saved preset for ${equipmentName} on ${boneName}`);
+                offsets = {
+                    position: preset.position,
+                    rotation: preset.rotation,
+                    scale: preset.scale
+                };
+
+                // Notify UI about preset
+                if (this.uiController.showPresetIndicator) {
+                    this.uiController.showPresetIndicator(slot, true);
+                }
+            }
+        }
+
+        // If no preset found, use default or custom offsets
+        if (!offsets) {
+            offsets = {
+                position: customOffsets.position || slotConfig.defaultOffsets,
+                rotation: customOffsets.rotation || { x: 0, y: 0, z: 0 },
+                scale: customOffsets.scale || 1.0
+            };
+        }
 
         // Attach to bone
         const success = this.attachToBone(equipment, slotConfig.bone, offsets, slot);
@@ -622,8 +649,9 @@ class EquipmentManager {
      * Update equipment position offset
      * @param {string} slot - Equipment slot
      * @param {Object} newOffsets - {position: {x,y,z}, rotation: {x,y,z}, scale: number}
+     * @param {boolean} savePreset - Whether to save as preset (default true)
      */
-    updateOffsets(slot, newOffsets) {
+    updateOffsets(slot, newOffsets, savePreset = true) {
         const item = this.equippedItems.get(slot);
         if (!item) return false;
 
@@ -662,8 +690,17 @@ class EquipmentManager {
             item.offsets.scale = scaleMultiplier;
         }
 
-        // Axis helper and sphere automatically follow equipment transform
-        // No need to update them manually
+        // Save preset to localStorage
+        if (savePreset) {
+            const modelName = this.getCurrentModelName();
+            const inventoryItem = this.getInventoryItem(slot);
+            const equipmentName = inventoryItem ? inventoryItem.fileName : null;
+            const boneName = item.boneName;
+
+            if (modelName && equipmentName && boneName) {
+                this.saveEquipmentPreset(modelName, equipmentName, boneName, item.offsets);
+            }
+        }
 
         return true;
     }
@@ -1090,6 +1127,195 @@ class EquipmentManager {
         code += `// Match rate: ${mappingResult.matchRate} (${mappingResult.totalMatched}/${mappingResult.totalMixamoBones} bones)\n`;
 
         return code;
+    }
+
+    // ==================== EQUIPMENT PRESET PERSISTENCE ====================
+
+    /**
+     * Generate unique storage key for model + equipment + bone combination
+     * @param {string} modelName - Model filename
+     * @param {string} equipmentName - Equipment filename
+     * @param {string} boneName - Bone name
+     * @returns {string} Unique storage key
+     */
+    generatePresetKey(modelName, equipmentName, boneName) {
+        return `${modelName}|${equipmentName}|${boneName}`;
+    }
+
+    /**
+     * Get current model name
+     * @returns {string|null}
+     */
+    getCurrentModelName() {
+        const model = this.threeSetup.getLoadedModel();
+        return model?.userData?.fileName || null;
+    }
+
+    /**
+     * Save equipment preset to localStorage
+     * @param {string} modelName - Model filename
+     * @param {string} equipmentName - Equipment filename
+     * @param {string} boneName - Bone name
+     * @param {Object} offsets - Position, rotation, scale offsets
+     */
+    saveEquipmentPreset(modelName, equipmentName, boneName, offsets) {
+        if (!modelName || !equipmentName || !boneName) {
+            console.warn('Cannot save preset: missing model, equipment, or bone name');
+            return false;
+        }
+
+        try {
+            // Load existing presets
+            const presetsData = localStorage.getItem('equipmentPresets');
+            const presets = presetsData ? JSON.parse(presetsData) : {};
+
+            // Generate key
+            const key = this.generatePresetKey(modelName, equipmentName, boneName);
+
+            // Save preset
+            presets[key] = {
+                position: offsets.position || { x: 0, y: 0, z: 0 },
+                rotation: offsets.rotation || { x: 0, y: 0, z: 0 },
+                scale: offsets.scale || 1.0,
+                boneName: boneName,
+                modelName: modelName,
+                equipmentName: equipmentName,
+                timestamp: Date.now()
+            };
+
+            localStorage.setItem('equipmentPresets', JSON.stringify(presets));
+            console.log(`💾 Equipment preset saved: ${key}`);
+            return true;
+        } catch (error) {
+            console.error('Failed to save equipment preset:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Load equipment preset from localStorage
+     * @param {string} modelName - Model filename
+     * @param {string} equipmentName - Equipment filename
+     * @param {string} boneName - Bone name
+     * @returns {Object|null} Preset offsets or null if not found
+     */
+    loadEquipmentPreset(modelName, equipmentName, boneName) {
+        if (!modelName || !equipmentName || !boneName) return null;
+
+        try {
+            const presetsData = localStorage.getItem('equipmentPresets');
+            if (!presetsData) return null;
+
+            const presets = JSON.parse(presetsData);
+            const key = this.generatePresetKey(modelName, equipmentName, boneName);
+
+            if (presets[key]) {
+                console.log(`📂 Loaded equipment preset: ${key}`);
+                return presets[key];
+            }
+        } catch (error) {
+            console.error('Failed to load equipment preset:', error);
+        }
+        return null;
+    }
+
+    /**
+     * Check if preset exists for combination
+     * @param {string} modelName - Model filename
+     * @param {string} equipmentName - Equipment filename
+     * @param {string} boneName - Bone name
+     * @returns {boolean}
+     */
+    hasPreset(modelName, equipmentName, boneName) {
+        try {
+            const presetsData = localStorage.getItem('equipmentPresets');
+            if (!presetsData) return false;
+
+            const presets = JSON.parse(presetsData);
+            const key = this.generatePresetKey(modelName, equipmentName, boneName);
+            return !!presets[key];
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * Clear specific preset
+     * @param {string} modelName - Model filename
+     * @param {string} equipmentName - Equipment filename
+     * @param {string} boneName - Bone name
+     */
+    clearEquipmentPreset(modelName, equipmentName, boneName) {
+        if (!modelName || !equipmentName || !boneName) return false;
+
+        try {
+            const presetsData = localStorage.getItem('equipmentPresets');
+            if (!presetsData) return false;
+
+            const presets = JSON.parse(presetsData);
+            const key = this.generatePresetKey(modelName, equipmentName, boneName);
+
+            if (presets[key]) {
+                delete presets[key];
+                localStorage.setItem('equipmentPresets', JSON.stringify(presets));
+                console.log(`🗑️ Cleared equipment preset: ${key}`);
+                return true;
+            }
+        } catch (error) {
+            console.error('Failed to clear equipment preset:', error);
+        }
+        return false;
+    }
+
+    /**
+     * Clear preset by full key
+     * @param {string} key - Preset key (modelName|equipmentName|boneName)
+     */
+    clearEquipmentPresetByKey(key) {
+        try {
+            const presetsData = localStorage.getItem('equipmentPresets');
+            if (!presetsData) return false;
+
+            const presets = JSON.parse(presetsData);
+
+            if (presets[key]) {
+                delete presets[key];
+                localStorage.setItem('equipmentPresets', JSON.stringify(presets));
+                console.log(`🗑️ Cleared equipment preset: ${key}`);
+                return true;
+            }
+        } catch (error) {
+            console.error('Failed to clear equipment preset:', error);
+        }
+        return false;
+    }
+
+    /**
+     * Get all saved presets
+     * @returns {Object} All presets
+     */
+    getAllPresets() {
+        try {
+            const presetsData = localStorage.getItem('equipmentPresets');
+            return presetsData ? JSON.parse(presetsData) : {};
+        } catch (error) {
+            console.error('Failed to get presets:', error);
+            return {};
+        }
+    }
+
+    /**
+     * Clear all presets
+     */
+    clearAllPresets() {
+        try {
+            localStorage.removeItem('equipmentPresets');
+            console.log('🗑️ Cleared all equipment presets');
+            return true;
+        } catch (error) {
+            console.error('Failed to clear all presets:', error);
+            return false;
+        }
     }
 
     // ==================== MANUAL BONE MAPPING ====================

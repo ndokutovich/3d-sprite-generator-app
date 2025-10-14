@@ -146,11 +146,28 @@ class EquipmentTransformCommand extends Command {
     }
 
     execute() {
-        this.equipmentManager.updateOffsets(this.slot, this.newOffsets);
+        // savePreset=true when executing normally
+        this.equipmentManager.updateOffsets(this.slot, this.newOffsets, true);
+        // Sync UI
+        this.syncUI();
     }
 
     undo() {
-        this.equipmentManager.updateOffsets(this.slot, this.oldOffsets);
+        // savePreset=false when undoing to avoid overwriting preset
+        this.equipmentManager.updateOffsets(this.slot, this.oldOffsets, false);
+        // Sync UI
+        this.syncUI();
+    }
+
+    syncUI() {
+        // Update UI sliders to reflect current values
+        if (window.app && window.app.uiController) {
+            window.app.uiController.setEquipmentAdjustmentValues({
+                position: this.equipmentManager.equippedItems.get(this.slot)?.offsets?.position,
+                rotation: this.equipmentManager.equippedItems.get(this.slot)?.offsets?.rotation,
+                scale: this.equipmentManager.equippedItems.get(this.slot)?.offsets?.scale
+            });
+        }
     }
 }
 

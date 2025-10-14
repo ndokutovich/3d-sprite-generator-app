@@ -168,6 +168,14 @@
                                     <option value="">Select equipped item...</option>
                                 </select>
 
+                                <!-- Preset Indicator -->
+                                <div id="presetIndicator" style="display: none; background: rgba(76, 175, 80, 0.2); border: 1px solid #4caf50; border-radius: 4px; padding: 8px; margin-bottom: 10px; font-size: 13px;">
+                                    <span style="color: #4caf50;">✨ Preset Active</span>
+                                    <button id="clearPresetBtn" style="float: right; background: #dc3545; padding: 2px 8px; font-size: 11px; border-radius: 3px;">Clear</button>
+                                    <div style="clear: both;"></div>
+                                    <div style="margin-top: 5px; color: #aaa; font-size: 11px;">Saved settings auto-applied</div>
+                                </div>
+
                                 <label><strong>Scale:</strong> <span id="equipScaleValue">1.00</span>x</label>
                                 <input type="range" id="equipScale" min="0.1" max="10" step="0.1" value="1" disabled>
 
@@ -194,6 +202,13 @@
                                 <input type="range" id="equipRotZ" min="-180" max="180" step="5" value="0" disabled>
                             </div>
                         </details>
+                    </div>
+
+                    <!-- Preset Manager -->
+                    <div style="margin-top: 10px;">
+                        <button id="openPresetManagerBtn" style="width: 100%; background: #6c5ce7;">
+                            💾 Manage Equipment Presets
+                        </button>
                     </div>
                 </div>
 
@@ -466,6 +481,43 @@
                                 <div id="mixamoRigList" class="bone-list"></div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Equipment Preset Manager Modal -->
+    <div class="bone-viewer-modal" id="presetManagerModal" style="display: none;">
+        <div class="bone-viewer-content">
+            <div class="bone-viewer-header">
+                <h2>💾 Equipment Preset Manager</h2>
+                <span class="bone-viewer-close" id="presetManagerClose">&times;</span>
+            </div>
+
+            <div class="bone-viewer-body">
+                <div class="bone-viewer-section">
+                    <div class="info-box" style="margin-bottom: 15px;">
+                        <strong>Saved Equipment Presets</strong><br>
+                        Equipment position/rotation/scale settings are automatically saved per model-equipment-bone combination.
+                        View and manage all saved presets below.
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <button id="refreshPresetsBtn" class="mapping-btn" style="flex: 1;">
+                            🔄 Refresh
+                        </button>
+                        <button id="clearAllPresetsBtn" class="mapping-btn" style="flex: 1; background: #dc3545;">
+                            🗑️ Clear All Presets
+                        </button>
+                    </div>
+
+                    <div id="presetCount" style="margin-bottom: 15px; padding: 10px; background: #1a1a2e; border-radius: 5px; text-align: center; font-weight: bold;">
+                        Loading presets...
+                    </div>
+
+                    <div id="presetsList" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Presets will be inserted here -->
                     </div>
                 </div>
             </div>

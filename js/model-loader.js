@@ -50,13 +50,13 @@ class ModelLoader {
         return new Promise((resolve, reject) => {
             try {
                 if (extension === 'glb' || extension === 'gltf') {
-                    this.loadGLTF(loader, contents, resolve, reject);
+                    this.loadGLTF(loader, contents, fileName, resolve, reject);
                 } else if (extension === 'fbx') {
-                    this.loadFBX(loader, contents, resolve, reject);
+                    this.loadFBX(loader, contents, fileName, resolve, reject);
                 } else if (extension === 'stl') {
-                    this.loadSTL(loader, contents, resolve, reject);
+                    this.loadSTL(loader, contents, fileName, resolve, reject);
                 } else if (extension === 'obj') {
-                    this.loadOBJ(loader, contents, resolve, reject);
+                    this.loadOBJ(loader, contents, fileName, resolve, reject);
                 }
             } catch (error) {
                 console.error('Error loading model:', error);
@@ -68,13 +68,13 @@ class ModelLoader {
         });
     }
 
-    loadGLTF(loader, contents, resolve, reject) {
+    loadGLTF(loader, contents, fileName, resolve, reject) {
         this.uiController.updateProgress(CONFIG.PROGRESS.PARSE_FORMAT, 'Parsing GLTF/GLB...');
 
         loader.parse(contents, '', (gltf) => {
             this.uiController.updateProgress(CONFIG.PROGRESS.BUILD_SCENE, 'Building scene...');
 
-            this.threeSetup.addModel(gltf.scene);
+            this.threeSetup.addModel(gltf.scene, fileName);
 
             if (gltf.animations && gltf.animations.length > 0) {
                 this.uiController.updateProgress(CONFIG.PROGRESS.LOAD_ANIMATIONS, 'Loading animations...');
@@ -93,14 +93,14 @@ class ModelLoader {
         });
     }
 
-    loadFBX(loader, contents, resolve, reject) {
+    loadFBX(loader, contents, fileName, resolve, reject) {
         this.uiController.updateProgress(CONFIG.PROGRESS.PARSE_FORMAT, 'Parsing FBX...');
 
         try {
             const model = loader.parse(contents, '');
             this.uiController.updateProgress(CONFIG.PROGRESS.BUILD_SCENE, 'Building scene...');
 
-            this.threeSetup.addModel(model);
+            this.threeSetup.addModel(model, fileName);
 
             if (model.animations && model.animations.length > 0) {
                 this.uiController.updateProgress(CONFIG.PROGRESS.LOAD_ANIMATIONS, 'Loading animations...');
@@ -119,7 +119,7 @@ class ModelLoader {
         }
     }
 
-    loadSTL(loader, contents, resolve, reject) {
+    loadSTL(loader, contents, fileName, resolve, reject) {
         this.uiController.updateProgress(CONFIG.PROGRESS.PARSE_FORMAT, 'Parsing STL...');
 
         try {
@@ -132,7 +132,7 @@ class ModelLoader {
             });
             const mesh = new THREE.Mesh(geometry, material);
 
-            this.threeSetup.addModel(mesh);
+            this.threeSetup.addModel(mesh, fileName);
 
             this.uiController.updateProgress(CONFIG.PROGRESS.CENTER_MODEL, 'Centering model...');
             this.threeSetup.centerAndScaleModel();
@@ -146,14 +146,14 @@ class ModelLoader {
         }
     }
 
-    loadOBJ(loader, contents, resolve, reject) {
+    loadOBJ(loader, contents, fileName, resolve, reject) {
         this.uiController.updateProgress(CONFIG.PROGRESS.PARSE_FORMAT, 'Parsing OBJ...');
 
         try {
             const model = loader.parse(contents);
             this.uiController.updateProgress(CONFIG.PROGRESS.BUILD_SCENE, 'Building scene...');
 
-            this.threeSetup.addModel(model);
+            this.threeSetup.addModel(model, fileName);
 
             this.uiController.updateProgress(CONFIG.PROGRESS.CENTER_MODEL, 'Centering model...');
             this.threeSetup.centerAndScaleModel();

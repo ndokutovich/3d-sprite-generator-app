@@ -8,8 +8,8 @@ class App {
         this.modelLoader = new ModelLoader(this.threeSetup, this.uiController);
         this.equipmentManager = new EquipmentManager(this.threeSetup, this.uiController);
         this.animationController = new AnimationController(this.threeSetup, this.uiController, this.animationLibrary, this.equipmentManager);
-        this.gizmoController = new GizmoController(this.threeSetup, this.equipmentManager, this.uiController);
         this.undoManager = new UndoManager();
+        this.gizmoController = new GizmoController(this.threeSetup, this.equipmentManager, this.uiController, this.undoManager);
         this.spriteGenerator = new SpriteGenerator(this.threeSetup, this.uiController, this.animationController);
         this.fileHandler = new FileHandler(this.uiController);
 
@@ -130,6 +130,7 @@ class App {
         this.uiController.onUnequipAllClick(() => this.handleUnequipAll());
         this.uiController.onAdjustEquipmentSlotChange((e) => this.handleAdjustEquipmentSlotChange(e));
         this.uiController.onEquipmentAdjustmentChange((e) => this.handleEquipmentAdjustmentChange(e));
+        this.uiController.onClearPresetClick(() => this.handleClearPreset());
 
         // Bone Viewer controls
         this.uiController.onViewBonesClick(() => this.handleViewBones());
@@ -150,6 +151,12 @@ class App {
 
         // Undo/Redo controls
         this.setupUndoRedoControls();
+
+        // Preset Manager controls
+        this.uiController.onOpenPresetManagerClick(() => this.handleOpenPresetManager());
+        this.uiController.onPresetManagerClose(() => this.uiController.closePresetManager());
+        this.uiController.onRefreshPresetsClick(() => this.handleRefreshPresets());
+        this.uiController.onClearAllPresetsClick(() => this.handleClearAllPresets());
 
         // Rotation Test controls (per-axis)
         this.currentRotation = { x: 180, y: 0, z: 0 }; // Track current values
@@ -450,9 +457,58 @@ class App {
                     scale: item.offsets.scale
                 };
             }
+
+            // Check if preset exists for this equipment and show indicator
+            const modelName = this.equipmentManager.getCurrentModelName();
+            const inventoryItem = this.equipmentManager.getInventoryItem(slot);
+            const equipmentName = inventoryItem ? inventoryItem.fileName : null;
+            const boneName = item ? item.boneName : null;
+
+            if (modelName && equipmentName && boneName) {
+                const hasPreset = this.equipmentManager.hasPreset(modelName, equipmentName, boneName);
+                if (hasPreset) {
+                    this.uiController.showPresetIndicator(slot, true);
+                } else {
+                    this.uiController.hidePresetIndicator();
+                }
+            } else {
+                this.uiController.hidePresetIndicator();
+            }
         } else {
             this.uiController.disableEquipmentAdjustments();
+            this.uiController.hidePresetIndicator();
             this.lastEquipmentOffsets = null;
+        }
+    }
+
+    handleClearPreset() {
+        // Get selected equipment slot
+        const slot = this.uiController.getEquipmentAdjustments().slot;
+        if (!slot) {
+            console.warn('No equipment selected');
+            return;
+        }
+
+        // Get preset details
+        const modelName = this.equipmentManager.getCurrentModelName();
+        const inventoryItem = this.equipmentManager.getInventoryItem(slot);
+        const equipmentName = inventoryItem ? inventoryItem.fileName : null;
+        const item = this.equipmentManager.getEquipped(slot);
+        const boneName = item ? item.boneName : null;
+
+        if (!modelName || !equipmentName || !boneName) {
+            console.warn('Cannot clear preset: missing information');
+            return;
+        }
+
+        // Clear the preset
+        const success = this.equipmentManager.clearEquipmentPreset(modelName, equipmentName, boneName);
+
+        if (success) {
+            this.uiController.hidePresetIndicator();
+            console.log(`✅ Cleared preset for ${equipmentName} on ${boneName}`);
+        } else {
+            console.warn('Failed to clear preset');
         }
     }
 
@@ -728,6 +784,45 @@ class App {
         }, 100);
 
         console.log('🎯 Camera pointed to center (0, 0, 0)');
+    }
+
+    // Preset Manager Handlers
+
+    handleOpenPresetManager() {
+        this.uiController.showPresetManager();
+        this.handleRefreshPresets();
+        console.log('💾 Preset Manager opened');
+    }
+
+    handleRefreshPresets() {
+        const presets = this.equipmentManager.getAllPresets();
+        this.uiController.updatePresetsList(presets, (key) => this.handleDeletePreset(key));
+        console.log(`📊 Loaded ${Object.keys(presets).length} presets`);
+    }
+
+    handleDeletePreset(key) {
+        const success = this.equipmentManager.clearEquipmentPresetByKey(key);
+
+        if (success) {
+            console.log(`✅ Deleted preset: ${key}`);
+            this.handleRefreshPresets(); // Refresh the list
+        } else {
+            console.error('❌ Failed to delete preset');
+        }
+    }
+
+    handleClearAllPresets() {
+        if (confirm('⚠️ Delete ALL equipment presets? This cannot be undone!')) {
+            const success = this.equipmentManager.clearAllPresets();
+
+            if (success) {
+                console.log('✅ All presets cleared');
+                this.handleRefreshPresets(); // Refresh the list
+                this.uiController.hidePresetIndicator(); // Hide any active preset indicator
+            } else {
+                console.error('❌ Failed to clear all presets');
+            }
+        }
     }
 
     animate() {
