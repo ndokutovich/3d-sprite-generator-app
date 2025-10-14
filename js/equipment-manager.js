@@ -245,46 +245,13 @@ class EquipmentManager {
         bone.getWorldPosition(worldPos);
         console.log('🦴 Bone world position:', worldPos.x.toFixed(3), worldPos.y.toFixed(3), worldPos.z.toFixed(3));
 
-        // Calculate helper size based on bone scale (inverse scale to stay constant size)
-        const avgBoneScale = (worldScale.x + worldScale.y + worldScale.z) / 3;
-        const helperSize = 1.0 / avgBoneScale; // Make it 1.0 units in world space
-
-        // Add LARGE axis helper (shows XYZ orientation)
-        const axisHelper = new THREE.AxesHelper(helperSize);
-        equipment.add(axisHelper);
-
-        // Also add a LARGE sphere at equipment origin for visibility
-        const sphereGeometry = new THREE.SphereGeometry(helperSize * 0.3, 16, 16);
-        const sphereMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff00ff,
-            wireframe: false, // Solid sphere, more visible
-            transparent: true,
-            opacity: 0.7,
-            depthTest: false // Always render on top
-        });
-        const sphereHelper = new THREE.Mesh(sphereGeometry, sphereMaterial);
-        sphereHelper.renderOrder = 999; // Render last (on top)
-        equipment.add(sphereHelper);
-
-        console.log('🎯 Helper size in bone space:', helperSize.toFixed(3), 'units (compensated for bone scale)');
-        console.log('🌐 This should appear as ~1.0 units in world space');
-
-        // ALSO add a world-space marker at the bone position (not attached to bone)
-        // This ensures we can ALWAYS see where the bone is, even if equipment helpers fail
-        const worldMarkerGeo = new THREE.SphereGeometry(0.05, 8, 8);
-        const worldMarkerMat = new THREE.MeshBasicMaterial({
-            color: 0x00ff00, // Bright green
-            depthTest: false
-        });
-        const worldMarker = new THREE.Mesh(worldMarkerGeo, worldMarkerMat);
-        worldMarker.position.copy(worldPos);
-        worldMarker.renderOrder = 1000;
-        this.threeSetup.scene.add(worldMarker);
-
-        console.log('✅ Added GREEN world-space marker at bone position');
-        console.log('🎯 Added axis helper (Red=X, Green=Y, Blue=Z) and pink sphere to equipment');
-        console.log('📍 Equipment local position:', equipment.position.x, equipment.position.y, equipment.position.z);
-        console.log('🔄 Equipment local rotation:', equipment.rotation.x, equipment.rotation.y, equipment.rotation.z);
+        // Visual helpers disabled - gizmo provides orientation info
+        // Equipment is now clean for sprite rendering
+        const axisHelper = null;
+        const sphereHelper = null;
+        const worldMarker = null;
+        console.log('📍 Equipment local position:', equipment.position.x.toFixed(3), equipment.position.y.toFixed(3), equipment.position.z.toFixed(3));
+        console.log('🔄 Equipment local rotation:', equipment.rotation.x.toFixed(3), equipment.rotation.y.toFixed(3), equipment.rotation.z.toFixed(3));
 
         // Store reference including bone scale and original equipment scale for future adjustments
         // Use slot as key (e.g., 'weapon', 'helmet') instead of boneName
@@ -302,10 +269,7 @@ class EquipmentManager {
         });
 
         console.log(`✅ Equipped [${slot}] to ${bone.name}`);
-        console.log('💡 Look for these markers:');
-        console.log('   1. BRIGHT GREEN SPHERE - marks bone world position (ALWAYS visible)');
-        console.log('   2. PINK SEMI-TRANSPARENT SPHERE - equipment origin');
-        console.log('   3. RGB AXIS ARROWS - equipment orientation (Red=X, Green=Y, Blue=Z)');
+        console.log('💡 Use gizmo controls or adjustment sliders to position equipment');
         return true;
     }
 

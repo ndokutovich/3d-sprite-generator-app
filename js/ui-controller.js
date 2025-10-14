@@ -998,4 +998,168 @@ class UIController {
             this.elements.equipScaleValue.textContent = offsets.scale.toFixed(2);
         }
     }
+
+    // Camera Properties Methods
+
+    /**
+     * Update camera angle displays (pitch, yaw, roll)
+     */
+    updateCameraAngles(angles) {
+        const pitchEl = document.getElementById('cameraPitch');
+        const yawEl = document.getElementById('cameraYaw');
+        const rollEl = document.getElementById('cameraRoll');
+
+        if (pitchEl) pitchEl.textContent = angles.pitch;
+        if (yawEl) yawEl.textContent = angles.yaw;
+        if (rollEl) rollEl.textContent = angles.roll;
+    }
+
+    /**
+     * Event handlers for camera property controls
+     */
+    onCameraPropertyChange(callback) {
+        const cameraControls = [
+            'camPosX', 'camPosY', 'camPosZ',
+            'camRotX', 'camRotY', 'camRotZ',
+            'camScaleX', 'camScaleY', 'camScaleZ'
+        ];
+
+        cameraControls.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener('input', () => {
+                    this.updateCameraPropertyDisplays();
+                    callback();
+                });
+            }
+        });
+    }
+
+    /**
+     * Update camera property display values
+     */
+    updateCameraPropertyDisplays() {
+        const updates = [
+            { input: 'camPosX', display: 'camPosXValue', decimals: 2 },
+            { input: 'camPosY', display: 'camPosYValue', decimals: 2 },
+            { input: 'camPosZ', display: 'camPosZValue', decimals: 2 },
+            { input: 'camRotX', display: 'camRotXValue', decimals: 0 },
+            { input: 'camRotY', display: 'camRotYValue', decimals: 0 },
+            { input: 'camRotZ', display: 'camRotZValue', decimals: 0 },
+            { input: 'camScaleX', display: 'camScaleXValue', decimals: 2, suffix: 'x' },
+            { input: 'camScaleY', display: 'camScaleYValue', decimals: 2, suffix: 'x' },
+            { input: 'camScaleZ', display: 'camScaleZValue', decimals: 2, suffix: 'x' }
+        ];
+
+        updates.forEach(({ input, display, decimals, suffix }) => {
+            const inputEl = document.getElementById(input);
+            const displayEl = document.getElementById(display);
+            if (inputEl && displayEl) {
+                const value = parseFloat(inputEl.value).toFixed(decimals);
+                displayEl.textContent = suffix ? value + suffix : value;
+            }
+        });
+    }
+
+    /**
+     * Get camera property values
+     */
+    getCameraProperties() {
+        return {
+            position: {
+                x: parseFloat(document.getElementById('camPosX')?.value || 3),
+                y: parseFloat(document.getElementById('camPosY')?.value || 1.5),
+                z: parseFloat(document.getElementById('camPosZ')?.value || 3)
+            },
+            rotation: {
+                x: parseFloat(document.getElementById('camRotX')?.value || 0) * (Math.PI / 180),
+                y: parseFloat(document.getElementById('camRotY')?.value || 0) * (Math.PI / 180),
+                z: parseFloat(document.getElementById('camRotZ')?.value || 0) * (Math.PI / 180)
+            },
+            scale: {
+                x: parseFloat(document.getElementById('camScaleX')?.value || 1),
+                y: parseFloat(document.getElementById('camScaleY')?.value || 1),
+                z: parseFloat(document.getElementById('camScaleZ')?.value || 1)
+            }
+        };
+    }
+
+    /**
+     * Reset camera properties to defaults
+     */
+    resetCameraProperties() {
+        const defaults = {
+            camPosX: CONFIG.CAMERA.DEFAULT_DISTANCE,
+            camPosY: CONFIG.CAMERA.DEFAULT_HEIGHT,
+            camPosZ: CONFIG.CAMERA.DEFAULT_DISTANCE,
+            camRotX: 0,
+            camRotY: 0,
+            camRotZ: 0,
+            camScaleX: 1,
+            camScaleY: 1,
+            camScaleZ: 1
+        };
+
+        Object.entries(defaults).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.value = value;
+            }
+        });
+
+        this.updateCameraPropertyDisplays();
+    }
+
+    /**
+     * Update camera property sliders to reflect current camera state
+     * (used for syncing when camera moves via OrbitControls)
+     */
+    syncCameraProperties(camera) {
+        // Update position sliders
+        const posX = document.getElementById('camPosX');
+        const posY = document.getElementById('camPosY');
+        const posZ = document.getElementById('camPosZ');
+        if (posX) posX.value = camera.position.x.toFixed(2);
+        if (posY) posY.value = camera.position.y.toFixed(2);
+        if (posZ) posZ.value = camera.position.z.toFixed(2);
+
+        // Update rotation sliders (convert from radians to degrees)
+        const rotX = document.getElementById('camRotX');
+        const rotY = document.getElementById('camRotY');
+        const rotZ = document.getElementById('camRotZ');
+        if (rotX) rotX.value = Math.round(camera.rotation.x * 180 / Math.PI);
+        if (rotY) rotY.value = Math.round(camera.rotation.y * 180 / Math.PI);
+        if (rotZ) rotZ.value = Math.round(camera.rotation.z * 180 / Math.PI);
+
+        // Update scale sliders
+        const scaleX = document.getElementById('camScaleX');
+        const scaleY = document.getElementById('camScaleY');
+        const scaleZ = document.getElementById('camScaleZ');
+        if (scaleX) scaleX.value = camera.scale.x.toFixed(2);
+        if (scaleY) scaleY.value = camera.scale.y.toFixed(2);
+        if (scaleZ) scaleZ.value = camera.scale.z.toFixed(2);
+
+        // Update display values
+        this.updateCameraPropertyDisplays();
+    }
+
+    /**
+     * Event handler for reset camera button
+     */
+    onResetCameraClick(callback) {
+        const btn = document.getElementById('resetCameraBtn');
+        if (btn) {
+            btn.addEventListener('click', callback);
+        }
+    }
+
+    /**
+     * Event handler for point to center button
+     */
+    onPointToCenterClick(callback) {
+        const btn = document.getElementById('pointToCenterBtn');
+        if (btn) {
+            btn.addEventListener('click', callback);
+        }
+    }
 }

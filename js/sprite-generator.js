@@ -152,8 +152,8 @@ class SpriteGenerator {
         this.threeSetup.setCameraPosition(x, context.height, z);
         this.threeSetup.setCameraLookAt(0, 0, 0);
 
-        // Render and capture
-        this.threeSetup.render();
+        // Render and capture (use renderClean to exclude gizmo and helpers)
+        this.threeSetup.renderClean();
         const dataURL = this.threeSetup.captureFrame();
 
         // Create sprite object

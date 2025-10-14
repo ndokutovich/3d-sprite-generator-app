@@ -119,9 +119,6 @@ class App {
             this.threeSetup.setCameraLightIntensity(intensity);
         });
 
-        // Advanced camera controls
-        this.setupAdvancedCameraControls();
-
         // Error close button
         this.uiController.onErrorClose(() => {
             this.uiController.hideError();
@@ -145,6 +142,11 @@ class App {
         this.uiController.onGizmoTargetChange(() => this.handleGizmoTargetChange());
         this.uiController.onGizmoEquipmentSlotChange(() => this.handleGizmoEquipmentSlotChange());
         this.uiController.onGizmoModeChange((mode) => this.handleGizmoModeChange(mode));
+
+        // Camera properties controls
+        this.uiController.onCameraPropertyChange(() => this.handleCameraPropertyChange());
+        this.uiController.onResetCameraClick(() => this.handleResetCamera());
+        this.uiController.onPointToCenterClick(() => this.handlePointToCenter());
 
         // Undo/Redo controls
         this.setupUndoRedoControls();
@@ -584,11 +586,10 @@ class App {
     }
 
     handleRotationTest(x, y, z) {
-        console.log(`\n🔄 Testing rotation: X:${x}° Y:${y}° Z:${z}°`);
-
         const model = this.threeSetup.getLoadedModel();
         if (!model) {
-            console.log('❌ No model loaded');
+            alert('⚠️ Please load a 3D model first!');
+            console.log('❌ No model loaded - cannot apply rotation test');
             return;
         }
 
@@ -599,13 +600,16 @@ class App {
             z * Math.PI / 180
         );
 
-        // Update UI display
+        // Update UI display to show current rotation
         document.getElementById('currentRotX').textContent = x;
         document.getElementById('currentRotY').textContent = y;
         document.getElementById('currentRotZ').textContent = z;
 
-        console.log('✅ Rotation applied to model!');
-        console.log('💡 This is a visual test only - does not affect animation retargeting');
+        // Force render to show change immediately
+        this.threeSetup.render();
+
+        console.log(`✅ Model rotation applied: X=${x}° Y=${y}° Z=${z}°`);
+        console.log('💡 This rotates the 3D model for visual testing. Use this to find the correct orientation for your sprites.');
     }
 
     // Gizmo Handlers
@@ -658,6 +662,74 @@ class App {
         this.gizmoController.setMode(mode);
     }
 
+    // Camera Properties Handlers
+
+    handleCameraPropertyChange() {
+        const props = this.uiController.getCameraProperties();
+        const camera = this.threeSetup.getCamera();
+        const controls = this.threeSetup.getOrbitControls();
+
+        // Set flag to prevent sync loop
+        this.isManualCameraAdjustment = true;
+
+        // Apply position
+        camera.position.set(props.position.x, props.position.y, props.position.z);
+
+        // Apply rotation (using Euler angles)
+        camera.rotation.set(props.rotation.x, props.rotation.y, props.rotation.z);
+
+        // Apply scale (zoom is scale.z)
+        camera.scale.set(props.scale.x, props.scale.y, props.scale.z);
+
+        // Update matrix
+        camera.updateMatrixWorld();
+
+        // Update OrbitControls target to match where camera is looking
+        // This prevents OrbitControls from fighting the manual rotation
+        const direction = new THREE.Vector3(0, 0, -1);
+        direction.applyQuaternion(camera.quaternion);
+        const distance = controls.target.distanceTo(camera.position);
+        controls.target.copy(camera.position).add(direction.multiplyScalar(distance));
+
+        controls.update();
+
+        // Clear flag after a short delay
+        setTimeout(() => {
+            this.isManualCameraAdjustment = false;
+        }, 100);
+    }
+
+    handleResetCamera() {
+        this.uiController.resetCameraProperties();
+        this.handleCameraPropertyChange();
+        console.log('📷 Camera reset to defaults');
+    }
+
+    handlePointToCenter() {
+        const camera = this.threeSetup.getCamera();
+        const controls = this.threeSetup.getOrbitControls();
+
+        // Set flag to prevent sync loop
+        this.isManualCameraAdjustment = true;
+
+        // Make camera look at center (0, 0, 0)
+        camera.lookAt(0, 0, 0);
+
+        // Update OrbitControls target to center
+        controls.target.set(0, 0, 0);
+        controls.update();
+
+        // Sync UI to reflect the new rotation
+        this.uiController.syncCameraProperties(camera);
+
+        // Clear flag after a short delay
+        setTimeout(() => {
+            this.isManualCameraAdjustment = false;
+        }, 100);
+
+        console.log('🎯 Camera pointed to center (0, 0, 0)');
+    }
+
     animate() {
         requestAnimationFrame(() => this.animate());
 
@@ -672,6 +744,17 @@ class App {
 
         // Rotate model (disabled by default with orbit controls)
         this.threeSetup.rotateModel();
+
+        // Update camera angles display (pitch, yaw, roll)
+        const angles = this.threeSetup.getCameraAngles();
+        this.uiController.updateCameraAngles(angles);
+
+        // Sync camera property sliders with actual camera state
+        // (but not during manual slider adjustments to avoid feedback loop)
+        if (!this.isManualCameraAdjustment) {
+            const camera = this.threeSetup.getCamera();
+            this.uiController.syncCameraProperties(camera);
+        }
 
         // Render scene
         this.threeSetup.render();
